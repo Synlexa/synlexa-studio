@@ -56,14 +56,23 @@ brew install --cask Synlexa/tap/synlexa-studio
 
 *(Note: Using `Synlexa/tap/synlexa-studio` taps and trusts the installed formula/cask automatically on Homebrew 6.0+/7.0+ without a separate `brew trust` step. If inspecting both formula and cask via `brew info synlexa-studio`, run `brew trust Synlexa/tap` once or pass `--formula`.)*
 
-### 4. npm (Cross-Platform Launcher & Wasm MCP Server)
+### 4. npm & GitHub Packages (`@synlexa/studio` + Desktop Icon)
+
+Published to [Synlexa GitHub Packages](https://github.com/orgs/Synlexa/packages) (and zero-auth release tarballs). Global install automatically registers a clickable **Synlexa Studio** Desktop & Applications/Start Menu icon alongside the `synlexa-studio` CLI:
 
 ```bash
-npm install -g https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.0/synlexa-studio-0.4.0.tgz
+# Direct zero-auth global install (creates Desktop icon + `synlexa-studio` CLI)
+npm install -g https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.2/synlexa-studio-0.4.2.tgz
 synlexa-studio
 
-# Or embed the Wasm bio-core SDK directly in Node/TS projects:
-npm install https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.0/synlexa-wasm-bridge-0.4.0.tgz
+# Or install scoped @synlexa/studio + native binaries from GitHub Packages (requires `read:packages` token in ~/.npmrc)
+npm install -g @synlexa/studio --@synlexa:registry=https://npm.pkg.github.com
+
+# Re-create Desktop / Applications shortcut anytime:
+synlexa-studio install-desktop
+
+# Embed the Wasm bio-core SDK directly in Node/TS projects:
+npm install https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.2/synlexa-wasm-bridge-0.4.2.tgz
 ```
 
 ### 5. Prebuilt Desktop & Binary Archives

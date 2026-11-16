@@ -795,11 +795,19 @@ fn resolve_dist_dir(dist_arg: Option<PathBuf>) -> PathBuf {
 }
 
 fn resolve_macos_icon_path() -> String {
+    if let Ok(env_icon) = env::var("SYNLEXA_ICON_PATH") {
+        let p = PathBuf::from(&env_icon);
+        if p.exists() {
+            return env_icon;
+        }
+    }
     if let Ok(exe) = env::current_exe() {
         if let Some(exe_dir) = exe.parent() {
-            let bundle_icon = exe_dir.join("../Resources/icon.icns");
-            if bundle_icon.exists() {
-                return bundle_icon.to_string_lossy().into_owned();
+            for rel in ["../Resources/icon.icns", "../icon.icns", "../assets/icon.icns"] {
+                let candidate = exe_dir.join(rel);
+                if candidate.exists() {
+                    return candidate.to_string_lossy().into_owned();
+                }
             }
         }
     }
@@ -824,7 +832,7 @@ fn parse_flag_value<'a>(args: &'a [String], flag: &str) -> Option<&'a str> {
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let args: Vec<String> = env::args().filter(|a| !a.starts_with("-psn_")).collect();
     let dist_arg = parse_flag_value(&args, "--dist").map(PathBuf::from);
     let explicit_port: Option<u16> = parse_flag_value(&args, "--port").and_then(|p| p.parse().ok());
     let auth_callback = parse_flag_value(&args, "--auth-callback").map(str::to_string);

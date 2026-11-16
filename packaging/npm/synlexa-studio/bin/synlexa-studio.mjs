@@ -1,43 +1,20 @@
 #!/usr/bin/env node
-import { createRequire } from 'node:module';
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { dirname, extname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { extname, join, resolve } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import http from 'node:http';
 import readline from 'node:readline';
+import {
+  findNativeBinary,
+  installDesktopShortcut,
+  PKG_ROOT,
+  readPackageMeta,
+  uninstallDesktopShortcut,
+} from '../scripts/desktop-shortcut.mjs';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const pkgRoot = resolve(__dirname, '..');
-const pkgMeta = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8'));
-const PKG_VERSION = pkgMeta.version || '0.4.0';
-const require = createRequire(import.meta.url);
-
-const PLATFORM_MAP = {
-  'darwin-arm64': '@synlexa/studio-darwin-arm64',
-  'darwin-x64': '@synlexa/studio-darwin-x64',
-  'linux-x64': '@synlexa/studio-linux-x64-gnu',
-  'linux-arm64': '@synlexa/studio-linux-arm64-gnu',
-  'win32-x64': '@synlexa/studio-win32-x64-msvc',
-  'win32-arm64': '@synlexa/studio-win32-arm64-msvc',
-};
-
-function findNativeBinary(name) {
-  const pkgName = PLATFORM_MAP[`${process.platform}-${process.arch}`];
-  const ext = process.platform === 'win32' ? '.exe' : '';
-  if (pkgName) {
-    try {
-      const pkgJsonPath = require.resolve(`${pkgName}/package.json`);
-      const candidate = join(dirname(pkgJsonPath), 'bin', `${name}${ext}`);
-      if (existsSync(candidate)) return candidate;
-    } catch {
-      // Optional native package not installed; fall back to bundled Wasm/JS runtime
-    }
-  }
-  const localCandidate = join(pkgRoot, 'bin', `${name}${ext}`);
-  if (existsSync(localCandidate)) return localCandidate;
-  return null;
-}
+const pkgRoot = PKG_ROOT;
+const pkgMeta = readPackageMeta();
+const PKG_VERSION = pkgMeta.version || '0.4.1';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -163,19 +140,16 @@ async function runWasmStdioMcp() {
 async function launchStudioWebHost(args) {
   const nativeHost = findNativeBinary('synlexa-studio-desktop-native');
   const distDir = join(pkgRoot, 'web-dist');
+  const iconIcns = join(pkgRoot, 'assets', 'icon.icns');
+  const spawnEnv = existsSync(iconIcns)
+    ? { ...process.env, SYNLEXA_ICON_PATH: iconIcns }
+    : process.env;
+
   if (nativeHost && existsSync(distDir)) {
-    const res = spawnSync(nativeHost, ['--dist', distDir, ...args], { stdio: 'inherit' });
-    process.exit(res.status ?? 0);
-  }
-  const homeNative = join(
-    process.env.HOME || process.env.USERPROFILE || '',
-    '.synlexa-studio',
-    'runtime',
-    'bin',
-    process.platform === 'win32' ? 'synlexa-studio-desktop-native.exe' : 'synlexa-studio-desktop-native',
-  );
-  if (existsSync(homeNative) && existsSync(distDir)) {
-    const res = spawnSync(homeNative, ['--dist', distDir, ...args], { stdio: 'inherit' });
+    const res = spawnSync(nativeHost, ['--dist', distDir, ...args], {
+      stdio: 'inherit',
+      env: spawnEnv,
+    });
     process.exit(res.status ?? 0);
   }
   if (!existsSync(distDir)) {
@@ -183,7 +157,8 @@ async function launchStudioWebHost(args) {
     process.exit(1);
   }
   const portIdx = args.indexOf('--port');
-  const port = portIdx >= 0 && args[portIdx + 1] ? Number(args[portIdx + 1]) : 4179;
+  const hasExplicitPort = portIdx >= 0 && Boolean(args[portIdx + 1]);
+  const requestedPort = hasExplicitPort ? Number(args[portIdx + 1]) : 4179;
   const noOpen = args.includes('--no-open');
 
   const server = http.createServer((req, res) => {
@@ -201,18 +176,47 @@ async function launchStudioWebHost(args) {
     res.end(content);
   });
 
-  server.listen(port, '127.0.0.1', () => {
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE' && !hasExplicitPort && requestedPort !== 0) {
+      server.listen(0, '127.0.0.1');
+      return;
+    }
+    throw err;
+  });
+
+  server.listen(requestedPort, '127.0.0.1', () => {
+    const addr = server.address();
+    const port = typeof addr === 'object' && addr ? addr.port : requestedPort;
     const url = `http://127.0.0.1:${port}/`;
     console.log(`Synlexa Studio (Research-Use-Only) running at ${url}`);
     if (!noOpen) openUrl(url);
   });
 }
 
-const args = process.argv.slice(2);
+const args = process.argv.slice(2).filter((arg) => !arg.startsWith('-psn_'));
 const sub = args[0];
 
-if (!sub || sub === 'launch' || sub === 'app' || sub.startsWith('--port') || sub === '--no-open') {
+if (
+  !sub ||
+  sub === 'launch' ||
+  sub === 'app' ||
+  sub === '--browser' ||
+  sub === '--no-open' ||
+  sub.startsWith('--port') ||
+  sub.startsWith('--auth-callback')
+) {
   await launchStudioWebHost(sub === 'launch' || sub === 'app' ? args.slice(1) : args);
+} else if (sub === 'install-desktop' || sub === '--install-desktop' || sub === 'desktop-icon') {
+  const created = installDesktopShortcut();
+  if (created.length === 0) {
+    console.log('Desktop shortcut installation is unsupported on this platform.');
+  } else {
+    console.log('Synlexa Studio desktop icon installed:');
+    for (const p of created) console.log(`  - ${p}`);
+  }
+} else if (sub === 'uninstall-desktop' || sub === '--uninstall-desktop') {
+  const removed = uninstallDesktopShortcut();
+  console.log(removed.length > 0 ? `Removed: ${removed.join(', ')}` : 'No Synlexa Studio desktop shortcuts found.');
 } else if (sub === 'mcp') {
   const nativeCli = findNativeBinary('studio-cli');
   if (nativeCli) {
@@ -223,12 +227,12 @@ if (!sub || sub === 'launch' || sub === 'app' || sub.startsWith('--port') || sub
 } else if (sub === '--help' || sub === '-h' || sub === 'help') {
   console.log(`Synlexa Studio v${PKG_VERSION} (Research-Use-Only)
 Usage:
-  synlexa-studio              Launch the local Synlexa Studio workspace in your browser
-  synlexa-studio mcp --stdio  Start the stdio MCP server for Claude Desktop / Codex / Cursor
-  synlexa-studio --version    Print version`);
-} else if (sub === '--version' || sub === '-v') {
-  const pkg = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8'));
-  console.log(pkg.version);
+  synlexa-studio                  Launch the local Synlexa Studio workspace
+  synlexa-studio install-desktop  Add a clickable Synlexa Studio Desktop & app launcher icon
+  synlexa-studio mcp --stdio      Start the stdio MCP server for Claude / Codex / Cursor
+  synlexa-studio --version        Print version`);
+} else if (sub === '--version' || sub === '-v' || sub === '-V' || sub === 'version') {
+  console.log(PKG_VERSION);
 } else {
   const nativeCli = findNativeBinary('studio-cli');
   if (nativeCli) {

@@ -9,12 +9,13 @@ on:
       version:
         description: "Release version tag (e.g. 0.4.0)"
         required: false
-        default: "0.4.1"
+        default: "0.4.2"
 
 permissions:
   contents: write
   id-token: write
   attestations: write
+  packages: write
 
 env:
   CARGO_TERM_COLOR: always
@@ -102,7 +103,13 @@ jobs:
           cargo build --release --locked --target aarch64-apple-darwin --manifest-path apps/desktop/native/Cargo.toml
           cargo build --release --locked --target x86_64-apple-darwin --manifest-path apps/desktop/native/Cargo.toml
 
-          mkdir -p dist/macos-universal/bin
+          mkdir -p dist/macos-universal/bin dist/npm-bins/darwin-arm64 dist/npm-bins/darwin-x64
+          cp target/aarch64-apple-darwin/release/studio-cli dist/npm-bins/darwin-arm64/studio-cli
+          cp apps/desktop/native/target/aarch64-apple-darwin/release/synlexa-studio-desktop-native dist/npm-bins/darwin-arm64/synlexa-studio-desktop-native
+          cp target/x86_64-apple-darwin/release/studio-cli dist/npm-bins/darwin-x64/studio-cli
+          cp apps/desktop/native/target/x86_64-apple-darwin/release/synlexa-studio-desktop-native dist/npm-bins/darwin-x64/synlexa-studio-desktop-native
+          chmod +x dist/npm-bins/darwin-arm64/* dist/npm-bins/darwin-x64/*
+
           lipo -create \
             target/aarch64-apple-darwin/release/studio-cli \
             target/x86_64-apple-darwin/release/studio-cli \
@@ -117,7 +124,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [[ "$GITHUB_REF_NAME" == "main" || -z "$VERSION" ]]; then
-            VERSION="${{ github.event.inputs.version || '0.4.1' }}"
+            VERSION="${{ github.event.inputs.version || '0.4.2' }}"
           fi
           echo "REL_VERSION=$VERSION" >> "$GITHUB_ENV"
 
@@ -183,6 +190,11 @@ jobs:
           name: macos-artifacts
           path: dist/out/*
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-platform-bins-macos
+          path: dist/npm-bins
+
   build-linux:
     name: Build Universal Linux (.AppImage, .deb, .tar.gz)
     needs: build-web-and-wasm
@@ -222,7 +234,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [[ "$GITHUB_REF_NAME" == "main" || -z "$VERSION" ]]; then
-            VERSION="${{ github.event.inputs.version || '0.4.1' }}"
+            VERSION="${{ github.event.inputs.version || '0.4.2' }}"
           fi
           cargo build --release --locked --target ${{ matrix.target }} -p studio-cli
           cargo build --release --locked --target ${{ matrix.target }} --manifest-path apps/desktop/native/Cargo.toml
@@ -232,6 +244,7 @@ jobs:
           cp "target/${{ matrix.target }}/release/studio-cli" "$STAGE/bin/"
           cp "apps/desktop/native/target/${{ matrix.target }}/release/synlexa-studio-desktop-native" "$STAGE/bin/"
           cp -R .artifacts-in/apps/web/dist/. "$STAGE/web-dist/"
+          cp apps/desktop/src-tauri/icons/icon.png "$STAGE/icon.png"
           tar -C "$STAGE" -czf "dist/out/synlexa-studio-v${VERSION}-${{ matrix.target }}.tar.gz" .
 
           # Build .deb package
@@ -323,7 +336,7 @@ jobs:
         shell: pwsh
         run: |
           $ver = "${{ github.ref_name }}".TrimStart("v")
-          if (-not $ver -or $ver -eq "main") { $ver = "${{ github.event.inputs.version || '0.4.1' }}" }
+          if (-not $ver -or $ver -eq "main") { $ver = "${{ github.event.inputs.version || '0.4.2' }}" }
           cargo build --release --locked --target ${{ matrix.target }} -p studio-cli
           cargo build --release --locked --target ${{ matrix.target }} --manifest-path apps/desktop/native/Cargo.toml
 
@@ -332,6 +345,7 @@ jobs:
           Copy-Item "target/${{ matrix.target }}/release/studio-cli.exe" "$stage/bin/studio-cli.exe"
           Copy-Item "apps/desktop/native/target/${{ matrix.target }}/release/synlexa-studio-desktop-native.exe" "$stage/bin/synlexa-studio.exe"
           Copy-Item -Recurse ".artifacts-in/apps/web/dist/*" "$stage/web-dist/"
+          Copy-Item "apps/desktop/src-tauri/icons/icon.ico" "$stage/icon.ico"
 
           Compress-Archive -Path "$stage/*" -DestinationPath "dist/out/Synlexa-Studio-v$ver-windows-${{ matrix.arch }}.zip" -Force
 
@@ -350,6 +364,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@synlexa"
 
       - name: Collect All Platform Artifacts
         uses: actions/download-artifact@v4
@@ -360,7 +376,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [[ "$GITHUB_REF_NAME" == "main" || -z "$VERSION" ]]; then
-            VERSION="${{ github.event.inputs.version || '0.4.1' }}"
+            VERSION="${{ github.event.inputs.version || '0.4.2' }}"
           fi
           mkdir -p release-files
           find release-staging -type f \( -name "*.dmg" -o -name "*.tar.gz" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.zip" -o -name "*.tgz" \) -exec cp {} release-files/ \;
@@ -404,3 +420,75 @@ jobs:
               fi
             fi
           done
+
+      - name: Assemble & Publish @synlexa/* npm Packages to GitHub Packages
+        if: startsWith(github.ref, 'refs/tags/v') && github.repository_owner == 'Synlexa'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p /tmp/npm-stage/darwin-arm64 /tmp/npm-stage/darwin-x64 \
+                   /tmp/npm-stage/linux-x64-gnu /tmp/npm-stage/linux-arm64-gnu \
+                   /tmp/npm-stage/win32-x64-msvc /tmp/npm-stage/win32-arm64-msvc
+
+          cp release-staging/npm-platform-bins-macos/darwin-arm64/* /tmp/npm-stage/darwin-arm64/
+          cp release-staging/npm-platform-bins-macos/darwin-x64/* /tmp/npm-stage/darwin-x64/
+
+          mkdir -p /tmp/ext-linux-x64 /tmp/ext-linux-arm64 /tmp/ext-win-x64 /tmp/ext-win-arm64
+          tar -xzf "release-files/synlexa-studio-v${VERSION}-x86_64-unknown-linux-gnu.tar.gz" -C /tmp/ext-linux-x64
+          cp /tmp/ext-linux-x64/bin/studio-cli /tmp/ext-linux-x64/bin/synlexa-studio-desktop-native /tmp/npm-stage/linux-x64-gnu/
+
+          tar -xzf "release-files/synlexa-studio-v${VERSION}-aarch64-unknown-linux-gnu.tar.gz" -C /tmp/ext-linux-arm64
+          cp /tmp/ext-linux-arm64/bin/studio-cli /tmp/ext-linux-arm64/bin/synlexa-studio-desktop-native /tmp/npm-stage/linux-arm64-gnu/
+
+          unzip -q "release-files/Synlexa-Studio-v${VERSION}-windows-x64.zip" -d /tmp/ext-win-x64
+          cp /tmp/ext-win-x64/bin/studio-cli.exe /tmp/npm-stage/win32-x64-msvc/studio-cli.exe
+          cp /tmp/ext-win-x64/bin/synlexa-studio.exe /tmp/npm-stage/win32-x64-msvc/synlexa-studio-desktop-native.exe
+
+          unzip -q "release-files/Synlexa-Studio-v${VERSION}-windows-arm64.zip" -d /tmp/ext-win-arm64
+          cp /tmp/ext-win-arm64/bin/studio-cli.exe /tmp/npm-stage/win32-arm64-msvc/studio-cli.exe
+          cp /tmp/ext-win-arm64/bin/synlexa-studio.exe /tmp/npm-stage/win32-arm64-msvc/synlexa-studio-desktop-native.exe
+
+          node packaging/npm/build-npm-packages.mjs \
+            --platform-bins-dir /tmp/npm-stage \
+            --web-dist release-staging/web-dist-and-npm/apps/web/dist \
+            --wasm release-staging/web-dist-and-npm/apps/web/public/wasm/synlexa_bio_core.wasm
+
+          PUBLISH_DIRS=(
+            dist/npm/studio-darwin-arm64
+            dist/npm/studio-darwin-x64
+            dist/npm/studio-linux-x64-gnu
+            dist/npm/studio-linux-arm64-gnu
+            dist/npm/studio-win32-x64-msvc
+            dist/npm/studio-win32-arm64-msvc
+            dist/npm/wasm-bridge
+            dist/npm/synlexa-studio
+          )
+
+          for dir in "${PUBLISH_DIRS[@]}"; do
+            PKG_NAME="$(node -e "console.log(JSON.parse(require('fs').readFileSync('${dir}/package.json','utf8')).name)")"
+            if npm view "${PKG_NAME}@${VERSION}" version --registry https://npm.pkg.github.com >/dev/null 2>&1; then
+              echo "Skipping ${PKG_NAME}@${VERSION} (already published to GitHub Packages)."
+            else
+              echo "Publishing ${PKG_NAME}@${VERSION} to GitHub Packages..."
+              npm publish "$dir" --registry https://npm.pkg.github.com
+            fi
+          done
+
+          if [ -n "${NPM_TOKEN:-}" ]; then
+            NPMJS_RC="/tmp/npmjs.npmrc"
+            printf "//registry.npmjs.org/:_authToken=%s\n" "$NPM_TOKEN" > "$NPMJS_RC"
+            for dir in "${PUBLISH_DIRS[@]}"; do
+              PKG_NAME="$(node -e "console.log(JSON.parse(require('fs').readFileSync('${dir}/package.json','utf8')).name)")"
+              if npm --userconfig "$NPMJS_RC" view "${PKG_NAME}@${VERSION}" version --registry https://registry.npmjs.org >/dev/null 2>&1; then
+                echo "Skipping ${PKG_NAME}@${VERSION} (already published to npmjs.org)."
+              else
+                echo "Publishing ${PKG_NAME}@${VERSION} to registry.npmjs.org..."
+                npm --userconfig "$NPMJS_RC" publish "$dir" --registry https://registry.npmjs.org --access public
+              fi
+            done
+            rm -f "$NPMJS_RC"
+          else
+            echo "NPM_TOKEN secret not configured; skipping public registry.npmjs.org publish (GitHub Packages @synlexa/* published)."
+          fi

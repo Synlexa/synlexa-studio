@@ -15,7 +15,8 @@ curl -fsSL https://github.com/Synlexa/synlexa-studio/releases/latest/download/in
 ```
 
 - Installs `synlexa-studio` and `studio-cli` into `~/.local/bin` and the runtime into `~/.synlexa-studio/runtime`.
-- On macOS, builds `Synlexa Studio.app` inside `/Applications` (or `~/Applications`) and strips quarantine attributes locally.
+- On macOS, builds `Synlexa Studio.app` inside `/Applications` (or `~/Applications`), creates a `~/Desktop/Synlexa Studio.app` Desktop icon, and strips quarantine attributes locally.
+- On Linux, installs the app icon and `.desktop` launcher into `~/.local/share/applications/synlexa-studio.desktop` and `~/Desktop/synlexa-studio.desktop`.
 - Override target version or directories with `SYNLEXA_VERSION`, `SYNLEXA_INSTALL_DIR`, or `SYNLEXA_BIN_DIR`.
 
 ### Windows PowerShell (`irm`)
@@ -24,7 +25,7 @@ curl -fsSL https://github.com/Synlexa/synlexa-studio/releases/latest/download/in
 irm https://github.com/Synlexa/synlexa-studio/releases/latest/download/install.ps1 | iex
 ```
 
-- Auto-detects `x64` vs `arm64`, unpacks binaries into `%USERPROFILE%\.synlexa-studio\runtime`, unblocks executables, and adds `bin` to User `PATH`.
+- Auto-detects `x64` vs `arm64`, unpacks binaries into `%USERPROFILE%\.synlexa-studio\runtime`, unblocks executables, adds `bin` to User `PATH`, and creates **Synlexa Studio** shortcuts on both Desktop and Start Menu.
 
 ## Homebrew (macOS & Linux)
 
@@ -47,19 +48,27 @@ studio-cli --version
 synlexa-studio mcp --stdio <<< '{"jsonrpc":"2.0","id":1,"method":"initialize"}'
 ```
 
-## npm Package (Cross-Platform Launcher & Wasm Core)
+## npm Package (`@synlexa/studio` & `@synlexa/wasm-bridge`)
 
-Install globally with Node.js >= 18:
+Global installation with Node.js >= 18 adds a clickable **Synlexa Studio** Desktop & Applications/Start Menu icon in addition to the `synlexa-studio` CLI:
 
 ```bash
-npm install -g https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.0/synlexa-studio-0.4.0.tgz
+# Direct zero-auth global install from GitHub Releases
+npm install -g https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.2/synlexa-studio-0.4.2.tgz
 synlexa-studio
+
+# Or install via GitHub Packages (https://github.com/orgs/Synlexa/packages) with a GitHub token (`read:packages`) in ~/.npmrc:
+#   @synlexa:registry=https://npm.pkg.github.com
+#   //npm.pkg.github.com/:_authToken=<GITHUB_TOKEN>
+npm install -g @synlexa/studio
 ```
+
+Run `synlexa-studio install-desktop` anytime to create or refresh the Desktop and launcher shortcut (`SYNLEXA_NO_DESKTOP_ICON=1` skips automatic shortcut creation during install).
 
 Use the Wasm SDK inside Node.js/TypeScript applications:
 
 ```bash
-npm install https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.0/synlexa-wasm-bridge-0.4.0.tgz
+npm install https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.2/synlexa-wasm-bridge-0.4.2.tgz
 ```
 
 ## Python Packages (`synlexa-studio-sdk` & `synlexa-compute`)
@@ -90,9 +99,9 @@ Every tagged release publishes `SHA256SUMS.txt` alongside:
 
 | Platform | Archive |
 |---|---|
-| macOS Universal (Apple Silicon + Intel) | `Synlexa-Studio-v0.4.0-universal-apple-darwin.dmg`, `synlexa-studio-v0.4.0-universal-apple-darwin.tar.gz` |
-| Windows (`x64` / `arm64`) | `Synlexa-Studio-v0.4.0-windows-x64.zip`, `Synlexa-Studio-v0.4.0-windows-arm64.zip` |
-| Linux (`x86_64` / `aarch64`) | `Synlexa-Studio-v0.4.0-universal-x86_64.AppImage`, `Synlexa-Studio-v0.4.0-linux-amd64.deb`, `Synlexa-Studio-v0.4.0-linux-arm64.deb`, `synlexa-studio-v0.4.0-x86_64-unknown-linux-gnu.tar.gz`, `synlexa-studio-v0.4.0-aarch64-unknown-linux-gnu.tar.gz` |
+| macOS Universal (Apple Silicon + Intel) | `Synlexa-Studio-v0.4.2-universal-apple-darwin.dmg`, `synlexa-studio-v0.4.2-universal-apple-darwin.tar.gz` |
+| Windows (`x64` / `arm64`) | `Synlexa-Studio-v0.4.2-windows-x64.zip`, `Synlexa-Studio-v0.4.2-windows-arm64.zip` |
+| Linux (`x86_64` / `aarch64`) | `Synlexa-Studio-v0.4.2-universal-x86_64.AppImage`, `Synlexa-Studio-v0.4.2-linux-amd64.deb`, `Synlexa-Studio-v0.4.2-linux-arm64.deb`, `synlexa-studio-v0.4.2-x86_64-unknown-linux-gnu.tar.gz`, `synlexa-studio-v0.4.2-aarch64-unknown-linux-gnu.tar.gz` |
 
 Verify downloaded archives with:
 

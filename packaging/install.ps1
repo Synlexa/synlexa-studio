@@ -1,6 +1,6 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
-$Version = if ($env:SYNLEXA_VERSION) { $env:SYNLEXA_VERSION } else { "0.4.1" }
+$Version = if ($env:SYNLEXA_VERSION) { $env:SYNLEXA_VERSION } else { "0.4.2" }
 $InstallDir = if ($env:SYNLEXA_INSTALL_DIR) { $env:SYNLEXA_INSTALL_DIR } else { Join-Path $HOME ".synlexa-studio\runtime" }
 $PrimaryReleasesBase = if ($env:SYNLEXA_RELEASES_BASE) { $env:SYNLEXA_RELEASES_BASE } else { "https://github.com/Synlexa/synlexa-studio/releases/download/v$Version" }
 $MirrorReleasesBase = "https://studio.synlexa.com/releases"
@@ -33,15 +33,47 @@ try {
     $env:Path = "$env:Path;$BinDir"
   }
 
+  $ExePath = Join-Path $BinDir "synlexa-studio.exe"
+  $IconPath = Join-Path $InstallDir "icon.ico"
+  $WebDist = Join-Path $InstallDir "web-dist"
+  try {
+    $WshShell = New-Object -ComObject WScript.Shell
+    $ShortcutTargets = @()
+    $DesktopDir = [Environment]::GetFolderPath("Desktop")
+    $ProgramsDir = [Environment]::GetFolderPath("Programs")
+    if ($DesktopDir -and (Test-Path $DesktopDir)) { $ShortcutTargets += (Join-Path $DesktopDir "Synlexa Studio.lnk") }
+    if ($ProgramsDir) {
+      New-Item -ItemType Directory -Force -Path $ProgramsDir | Out-Null
+      $ShortcutTargets += (Join-Path $ProgramsDir "Synlexa Studio.lnk")
+    }
+    foreach ($LnkPath in $ShortcutTargets) {
+      $Sc = $WshShell.CreateShortcut($LnkPath)
+      $Sc.TargetPath = $ExePath
+      $Sc.Arguments = "--dist `"$WebDist`""
+      $Sc.WorkingDirectory = $HOME
+      $Sc.Description = "Synlexa Studio — Deterministic Structural Biology & Cheminformatics Workbench (RUO)"
+      $Sc.WindowStyle = 7
+      if (Test-Path $IconPath) { $Sc.IconLocation = "$IconPath,0" }
+      $Sc.Save()
+      Write-Host "Created shortcut: $LnkPath"
+    }
+  } catch {
+    Write-Warning "Could not create Windows shortcuts automatically: $_"
+  }
+
   Write-Host "Installed Synlexa Studio into $InstallDir"
-  Write-Host "Run 'synlexa-studio' to open Studio or 'studio-cli mcp --stdio' for Claude/Codex MCP."
+  Write-Host "Open 'Synlexa Studio' from your Desktop / Start Menu, or run 'synlexa-studio' in terminal."
 } catch {
   if (Get-Command npm -ErrorAction SilentlyContinue) {
     Write-Host "Release archives unreachable; falling back to npm package..."
     try {
       npm install -g "$PrimaryReleasesBase/synlexa-studio-$Version.tgz"
     } catch {
-      npm install -g "$MirrorReleasesBase/synlexa-studio-$Version.tgz"
+      try {
+        npm install -g "$MirrorReleasesBase/synlexa-studio-$Version.tgz"
+      } catch {
+        npm install -g "@synlexa/studio"
+      }
     }
   } else {
     throw "Could not download $PrimaryUrl or $MirrorUrl and npm was not found. Visit https://www.synlexa.com/download"

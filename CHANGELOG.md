@@ -4,6 +4,13 @@ All notable changes to Synlexa Studio are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-11-16
+
+### Added
+- **GitHub Packages npm Registry Publishing (`@synlexa/studio`, `@synlexa/wasm-bridge` & 6 OS/Arch Native Packages)**: Automated scoped npm publishing to `https://npm.pkg.github.com` (visible at `https://github.com/orgs/Synlexa/packages`) alongside optional `registry.npmjs.org` support via `NPM_TOKEN` in `.github/workflows/release.yml`.
+- **Cross-Platform Desktop & Launcher Icons on Install**: Added `packaging/npm/synlexa-studio/scripts/desktop-shortcut.mjs`, `postinstall.mjs` desktop shortcut creation, and `synlexa-studio install-desktop` / `uninstall-desktop` CLI commands, plus Desktop & Start Menu / `.desktop` shortcut creation in `packaging/install.sh` (macOS + Linux) and `packaging/install.ps1` (Windows).
+- **CLI Icon & macOS LaunchServices Resilience**: Added `SYNLEXA_ICON_PATH` lookup and `-psn_*` argument filtering in `apps/desktop/native/src/main.rs` and `bin/synlexa-studio.mjs`, plus `EADDRINUSE` port fallback in the Node HTTP launcher.
+
 ## [0.4.1] - 2026-11-16
 
 ### Added

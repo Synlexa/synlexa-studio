@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-VERSION="${SYNLEXA_VERSION:-0.4.1}"
+VERSION="${SYNLEXA_VERSION:-0.4.2}"
 INSTALL_DIR="${SYNLEXA_INSTALL_DIR:-$HOME/.synlexa-studio/runtime}"
 BIN_DIR="${SYNLEXA_BIN_DIR:-$HOME/.local/bin}"
 PRIMARY_RELEASES_BASE="${SYNLEXA_RELEASES_BASE:-https://github.com/Synlexa/synlexa-studio/releases/download/v${VERSION}}"
@@ -111,6 +111,17 @@ PLIST
       codesign --force --deep --sign - "$APP_BUNDLE" >/dev/null 2>&1 || true
       codesign --force --sign - "$INSTALL_DIR/bin/synlexa-studio-desktop-native" "$INSTALL_DIR/bin/studio-cli" >/dev/null 2>&1 || true
     fi
+    LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+    if [ -x "$LSREGISTER" ]; then
+      "$LSREGISTER" -f "$APP_BUNDLE" >/dev/null 2>&1 || true
+    fi
+    if [ -d "$HOME/Desktop" ] && [ -w "$HOME/Desktop" ]; then
+      DESKTOP_APP="$HOME/Desktop/Synlexa Studio.app"
+      if [ -L "$DESKTOP_APP" ] || [ ! -e "$DESKTOP_APP" ]; then
+        rm -f "$DESKTOP_APP"
+        ln -s "$APP_BUNDLE" "$DESKTOP_APP"
+      fi
+    fi
   fi
 
   cat > "$BIN_DIR/synlexa-studio" <<EOF
@@ -136,11 +147,58 @@ EOF
   echo "Installed Synlexa Studio runtime into $INSTALL_DIR"
   if [ -n "$APP_BUNDLE" ]; then
     echo "Installed macOS desktop app at: $APP_BUNDLE"
+    if [ -L "$HOME/Desktop/Synlexa Studio.app" ]; then
+      echo "Created Desktop icon at: $HOME/Desktop/Synlexa Studio.app"
+    fi
+  elif [ "$OS" = "Linux" ]; then
+    XDG_DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
+    APPS_DIR="$XDG_DATA/applications"
+    ICONS_DIR="$XDG_DATA/icons/hicolor/1024x1024/apps"
+    mkdir -p "$APPS_DIR" "$ICONS_DIR"
+    ICON_FIELD="synlexa-studio"
+    if [ -f "$INSTALL_DIR/icon.png" ]; then
+      cp "$INSTALL_DIR/icon.png" "$ICONS_DIR/synlexa-studio.png"
+      ICON_FIELD="$ICONS_DIR/synlexa-studio.png"
+    fi
+    DESKTOP_ENTRY_PATH="$APPS_DIR/synlexa-studio.desktop"
+    cat > "$DESKTOP_ENTRY_PATH" <<DESK
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Synlexa Studio
+GenericName=Computational Biology Workbench
+Comment=Deterministic Structural Biology & Cheminformatics Workbench (Research-Use-Only)
+Exec="$BIN_DIR/synlexa-studio"
+Icon=$ICON_FIELD
+Categories=Science;Education;Development;
+Terminal=false
+StartupNotify=true
+DESK
+    chmod 0755 "$DESKTOP_ENTRY_PATH"
+    LINUX_DESKTOP_DIR="$HOME/Desktop"
+    if command -v xdg-user-dir >/dev/null 2>&1; then
+      XDG_DESK="$(xdg-user-dir DESKTOP 2>/dev/null || true)"
+      if [ -n "$XDG_DESK" ] && [ "$XDG_DESK" != "$HOME" ] && [ -d "$XDG_DESK" ]; then
+        LINUX_DESKTOP_DIR="$XDG_DESK"
+      fi
+    fi
+    if [ -d "$LINUX_DESKTOP_DIR" ] && [ -w "$LINUX_DESKTOP_DIR" ]; then
+      cp "$DESKTOP_ENTRY_PATH" "$LINUX_DESKTOP_DIR/synlexa-studio.desktop"
+      chmod 0755 "$LINUX_DESKTOP_DIR/synlexa-studio.desktop"
+      if command -v gio >/dev/null 2>&1; then
+        gio set "$LINUX_DESKTOP_DIR/synlexa-studio.desktop" metadata::trusted true >/dev/null 2>&1 || true
+      fi
+      echo "Created Desktop icon at: $LINUX_DESKTOP_DIR/synlexa-studio.desktop"
+    fi
+    if command -v update-desktop-database >/dev/null 2>&1; then
+      update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
+    fi
+    echo "Installed Linux launcher entry at: $DESKTOP_ENTRY_PATH"
   fi
 elif command -v npm >/dev/null 2>&1; then
   echo "Native archives unavailable; installing cross-platform package via npm..."
-  npm install -g "${PRIMARY_RELEASES_BASE}/synlexa-studio-${VERSION}.tgz" || npm install -g "${MIRROR_RELEASES_BASE}/synlexa-studio-${VERSION}.tgz" || npm install -g synlexa-studio
-  echo "Installed synlexa-studio globally via npm."
+  npm install -g "${PRIMARY_RELEASES_BASE}/synlexa-studio-${VERSION}.tgz" || npm install -g "${MIRROR_RELEASES_BASE}/synlexa-studio-${VERSION}.tgz" || npm install -g @synlexa/studio
+  echo "Installed @synlexa/studio globally via npm."
 else
   echo "Failed to download $PRIMARY_URL and npm is not installed." >&2
   echo "Install Node.js/npm (https://nodejs.org) or visit https://www.synlexa.com/download" >&2

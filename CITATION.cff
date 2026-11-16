@@ -2,7 +2,7 @@ cff-version: 1.2.0
 title: "Synlexa Studio"
 message: "If you use Synlexa Studio in research or software, please cite it using this metadata."
 type: software
-version: "0.4.1"
+version: "0.4.2"
 date-released: "2026-11-16"
 license: Apache-2.0
 authors:

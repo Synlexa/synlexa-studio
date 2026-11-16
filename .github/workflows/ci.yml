@@ -128,11 +128,12 @@ jobs:
           cargo build -p studio-cli --release --locked
           node benchmarks/run_benchmarks.mjs
 
-      - name: Test npm Package Assembly
+      - name: Test npm Package Assembly & Desktop Shortcut Smoke
         run: |
           node packaging/npm/build-npm-packages.mjs
           VER="$(node -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).version)")"
           test "$(node dist/npm/synlexa-studio/bin/synlexa-studio.mjs --version)" = "$VER"
+          node packaging/npm/test-npm-packaging.mjs
 
   python-sdk-and-compute:
     name: Python SDK & GPU Compute Worker Tests

@@ -1,6 +1,6 @@
 {
-  "name": "synlexa-studio",
-  "version": "0.4.1",
+  "name": "@synlexa/studio",
+  "version": "0.4.2",
   "description": "Synlexa Studio desktop/browser launcher, MCP server (stdio & HTTP), and deterministic computational biology engine (Research-Use-Only).",
   "license": "Apache-2.0",
   "repository": {
@@ -13,6 +13,7 @@
     "synlexa-studio": "./bin/synlexa-studio.mjs"
   },
   "files": [
+    "assets/",
     "bin/",
     "scripts/",
     "wasm/",
@@ -28,12 +29,12 @@
     "node": ">=18.0.0"
   },
   "optionalDependencies": {
-    "@synlexa/studio-darwin-arm64": "0.4.1",
-    "@synlexa/studio-darwin-x64": "0.4.1",
-    "@synlexa/studio-linux-x64-gnu": "0.4.1",
-    "@synlexa/studio-linux-arm64-gnu": "0.4.1",
-    "@synlexa/studio-win32-x64-msvc": "0.4.1",
-    "@synlexa/studio-win32-arm64-msvc": "0.4.1"
+    "@synlexa/studio-darwin-arm64": "0.4.2",
+    "@synlexa/studio-darwin-x64": "0.4.2",
+    "@synlexa/studio-linux-x64-gnu": "0.4.2",
+    "@synlexa/studio-linux-arm64-gnu": "0.4.2",
+    "@synlexa/studio-win32-x64-msvc": "0.4.2",
+    "@synlexa/studio-win32-arm64-msvc": "0.4.2"
   },
   "keywords": [
     "synlexa",
