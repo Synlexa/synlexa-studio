@@ -7,11 +7,13 @@ This package is for **JavaScript / TypeScript developers** embedding Synlexa Stu
 ## Install
 
 ```sh
-# Direct zero-auth install from GitHub Releases:
-npm install https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.3/synlexa-wasm-bridge-0.4.3.tgz
+npm install @synlexa/wasm-bridge
 
 # Or via GitHub Packages (with read:packages token in ~/.npmrc):
 npm install @synlexa/wasm-bridge --@synlexa:registry=https://npm.pkg.github.com
+
+# Or direct release tarball:
+npm install https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.4/synlexa-wasm-bridge-0.4.4.tgz
 ```
 
 ## Example Usage

@@ -76,7 +76,7 @@ writeFileSync(
       private: false,
       license: 'Apache-2.0',
       description: 'For JS/TS Developers: WebAssembly biological & cheminformatics SDK for Node.js and browsers (not the desktop app; Research-Use-Only).',
-      repository: { type: 'git', url: 'https://github.com/Synlexa/synlexa-studio.git' },
+      repository: { type: 'git', url: 'git+https://github.com/Synlexa/synlexa-studio.git' },
       homepage: 'https://www.synlexa.com/docs',
       files: ['src/', 'wasm/', 'ABI.md', 'README.md', 'LICENSE', 'NOTICE'],
     },

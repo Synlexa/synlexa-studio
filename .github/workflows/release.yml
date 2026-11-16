@@ -9,7 +9,7 @@ on:
       version:
         description: "Release version tag (e.g. 0.4.0)"
         required: false
-        default: "0.4.3"
+        default: "0.4.4"
 
 permissions:
   contents: write
@@ -118,7 +118,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [[ "$GITHUB_REF_NAME" == "main" || -z "$VERSION" ]]; then
-            VERSION="${{ github.event.inputs.version || '0.4.3' }}"
+            VERSION="${{ github.event.inputs.version || '0.4.4' }}"
           fi
           echo "REL_VERSION=$VERSION" >> "$GITHUB_ENV"
 
@@ -223,7 +223,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [[ "$GITHUB_REF_NAME" == "main" || -z "$VERSION" ]]; then
-            VERSION="${{ github.event.inputs.version || '0.4.3' }}"
+            VERSION="${{ github.event.inputs.version || '0.4.4' }}"
           fi
           cargo build --release --locked --target ${{ matrix.target }} -p studio-cli
           cargo build --release --locked --target ${{ matrix.target }} --manifest-path apps/desktop/native/Cargo.toml
@@ -325,7 +325,7 @@ jobs:
         shell: pwsh
         run: |
           $ver = "${{ github.ref_name }}".TrimStart("v")
-          if (-not $ver -or $ver -eq "main") { $ver = "${{ github.event.inputs.version || '0.4.3' }}" }
+          if (-not $ver -or $ver -eq "main") { $ver = "${{ github.event.inputs.version || '0.4.4' }}" }
           cargo build --release --locked --target ${{ matrix.target }} -p studio-cli
           cargo build --release --locked --target ${{ matrix.target }} --manifest-path apps/desktop/native/Cargo.toml
 
@@ -352,7 +352,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: "https://npm.pkg.github.com"
           scope: "@synlexa"
 
@@ -365,7 +365,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [[ "$GITHUB_REF_NAME" == "main" || -z "$VERSION" ]]; then
-            VERSION="${{ github.event.inputs.version || '0.4.3' }}"
+            VERSION="${{ github.event.inputs.version || '0.4.4' }}"
           fi
           mkdir -p release-files
           find release-staging -type f \( -name "*.dmg" -o -name "*.tar.gz" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.zip" -o -name "*.tgz" \) -exec cp {} release-files/ \;
@@ -414,19 +414,13 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') && github.repository_owner == 'Synlexa'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           node packaging/npm/build-npm-packages.mjs \
             --web-dist release-staging/web-dist-and-npm/apps/web/dist \
             --wasm release-staging/web-dist-and-npm/apps/web/public/wasm/synlexa_bio_core.wasm
 
-          PUBLISH_DIRS=(
-            dist/npm/wasm-bridge
-            dist/npm/synlexa-studio
-          )
-
-          for dir in "${PUBLISH_DIRS[@]}"; do
+          for dir in dist/npm/wasm-bridge dist/npm/synlexa-studio; do
             PKG_NAME="$(node -e "console.log(JSON.parse(require('fs').readFileSync('${dir}/package.json','utf8')).name)")"
             if npm view "${PKG_NAME}@${VERSION}" version --registry https://npm.pkg.github.com >/dev/null 2>&1; then
               echo "Skipping ${PKG_NAME}@${VERSION} (already published to GitHub Packages)."
@@ -436,19 +430,23 @@ jobs:
             fi
           done
 
-          if [ -n "${NPM_TOKEN:-}" ]; then
-            NPMJS_RC="/tmp/npmjs.npmrc"
-            printf "//registry.npmjs.org/:_authToken=%s\n" "$NPM_TOKEN" > "$NPMJS_RC"
-            for dir in "${PUBLISH_DIRS[@]}"; do
-              PKG_NAME="$(node -e "console.log(JSON.parse(require('fs').readFileSync('${dir}/package.json','utf8')).name)")"
-              if npm --userconfig "$NPMJS_RC" view "${PKG_NAME}@${VERSION}" version --registry https://registry.npmjs.org >/dev/null 2>&1; then
-                echo "Skipping ${PKG_NAME}@${VERSION} (already published to npmjs.org)."
-              else
-                echo "Publishing ${PKG_NAME}@${VERSION} to registry.npmjs.org..."
-                npm --userconfig "$NPMJS_RC" publish "$dir" --registry https://registry.npmjs.org --access public
-              fi
-            done
-            rm -f "$NPMJS_RC"
-          else
-            echo "NPM_TOKEN secret not configured; skipping public registry.npmjs.org publish (GitHub Packages @synlexa/* published)."
-          fi
+      - name: Publish @synlexa/* npm Packages to npmjs.org (OIDC Trusted Publishing)
+        if: startsWith(github.ref, 'refs/tags/v') && github.repository_owner == 'Synlexa'
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          EMPTY_RC="/tmp/empty-npmjs.npmrc"
+          : > "$EMPTY_RC"
+          echo "Using npm $(npm --version) with OIDC Trusted Publishing..."
+
+          for dir in dist/npm/wasm-bridge dist/npm/synlexa-studio; do
+            PKG_NAME="$(node -e "console.log(JSON.parse(require('fs').readFileSync('${dir}/package.json','utf8')).name)")"
+            if env -u NPM_CONFIG_USERCONFIG -u NODE_AUTH_TOKEN -u NPM_TOKEN \
+              npm --userconfig "$EMPTY_RC" view "${PKG_NAME}@${VERSION}" version --registry https://registry.npmjs.org >/dev/null 2>&1; then
+              echo "Skipping ${PKG_NAME}@${VERSION} (already published to npmjs.org)."
+            else
+              echo "Publishing ${PKG_NAME}@${VERSION} to registry.npmjs.org via OIDC..."
+              env -u NPM_CONFIG_USERCONFIG -u NODE_AUTH_TOKEN -u NPM_TOKEN \
+                npm --userconfig "$EMPTY_RC" publish "$dir" --registry https://registry.npmjs.org --access public
+            fi
+          done
+          rm -f "$EMPTY_RC"

@@ -58,21 +58,18 @@ brew install --cask Synlexa/tap/synlexa-studio
 
 ### 4. npm & GitHub Packages (`@synlexa/studio` + Desktop Icon)
 
-Published to [Synlexa GitHub Packages](https://github.com/orgs/Synlexa/packages) (and zero-auth release tarballs). **`@synlexa/studio` is one all-in-one package for macOS (Apple Silicon & Intel), Windows, and Linux** — it automatically fetches the verified native desktop app for your computer and adds a clickable **Synlexa Studio** Desktop & Applications/Start Menu icon:
+Published to [npm (`@synlexa/studio`)](https://www.npmjs.com/package/@synlexa/studio) and [Synlexa GitHub Packages](https://github.com/orgs/Synlexa/packages). **`@synlexa/studio` is one all-in-one package for macOS (Apple Silicon & Intel), Windows, and Linux** — it automatically fetches the SHA-256-verified native desktop app for your computer and adds a clickable **Synlexa Studio** Desktop & Applications/Start Menu icon (either during install or on first launch under npm v12+):
 
 ```bash
-# Direct zero-auth global install (creates Desktop icon + `synlexa-studio` CLI)
-npm install -g https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.3/synlexa-studio-0.4.3.tgz
+# Install globally from npm (creates Desktop icon + `synlexa-studio` CLI)
+npm install -g @synlexa/studio
 synlexa-studio
-
-# Or install @synlexa/studio from GitHub Packages (requires `read:packages` token in ~/.npmrc)
-npm install -g @synlexa/studio --@synlexa:registry=https://npm.pkg.github.com
 
 # Re-create Desktop / Applications shortcut anytime:
 synlexa-studio install-desktop
 
 # For JS/TS developers: embed the Wasm bio-core SDK directly in Node/TS projects:
-npm install https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.3/synlexa-wasm-bridge-0.4.3.tgz
+npm install @synlexa/wasm-bridge
 ```
 
 ### 5. Prebuilt Desktop & Binary Archives

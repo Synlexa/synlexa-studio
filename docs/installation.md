@@ -50,25 +50,25 @@ synlexa-studio mcp --stdio <<< '{"jsonrpc":"2.0","id":1,"method":"initialize"}'
 
 ## npm Package (`@synlexa/studio` & `@synlexa/wasm-bridge`)
 
-**`@synlexa/studio` works on macOS (Apple Silicon M1–M4 & Intel), Windows, and Linux** — you do not need to select an OS-specific package. Global installation automatically fetches the SHA-256-verified native desktop runtime for your machine (falling back cleanly to the bundled Wasm runtime offline) and creates a clickable **Synlexa Studio** Desktop & Applications/Start Menu icon:
+**`@synlexa/studio` works on macOS (Apple Silicon M1–M4 & Intel), Windows, and Linux** — you do not need to select an OS-specific package. Global installation automatically fetches the SHA-256-verified native desktop runtime for your machine (during `postinstall` or on first launch under npm v12+ where lifecycle scripts default off, falling back cleanly to the bundled Wasm runtime offline) and creates a clickable **Synlexa Studio** Desktop & Applications/Start Menu icon:
 
 ```bash
-# Direct zero-auth global install from GitHub Releases
-npm install -g https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.3/synlexa-studio-0.4.3.tgz
+# Install globally from npm (no authentication required)
+npm install -g @synlexa/studio
 synlexa-studio
 
 # Or install via GitHub Packages (https://github.com/orgs/Synlexa/packages) with a GitHub token (`read:packages`) in ~/.npmrc:
 #   @synlexa:registry=https://npm.pkg.github.com
 #   //npm.pkg.github.com/:_authToken=<GITHUB_TOKEN>
-npm install -g @synlexa/studio
+npm install -g @synlexa/studio --@synlexa:registry=https://npm.pkg.github.com
 ```
 
-Run `synlexa-studio install-desktop` anytime to create or refresh the Desktop and launcher shortcut (`SYNLEXA_NO_DESKTOP_ICON=1` skips automatic shortcut creation during install).
+Run `synlexa-studio install-desktop` anytime to create or refresh the Desktop and launcher shortcut (`SYNLEXA_NO_DESKTOP_ICON=1` skips automatic shortcut creation).
 
 For JS/TS developers embedding the Wasm SDK inside Node.js/TypeScript applications:
 
 ```bash
-npm install https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.3/synlexa-wasm-bridge-0.4.3.tgz
+npm install @synlexa/wasm-bridge
 ```
 
 ## Python Packages (`synlexa-studio-sdk` & `synlexa-compute`)
@@ -99,9 +99,9 @@ Every tagged release publishes `SHA256SUMS.txt` alongside:
 
 | Platform | Archive |
 |---|---|
-| macOS Universal (Apple Silicon + Intel) | `Synlexa-Studio-v0.4.3-universal-apple-darwin.dmg`, `synlexa-studio-v0.4.3-universal-apple-darwin.tar.gz` |
-| Windows (`x64` / `arm64`) | `Synlexa-Studio-v0.4.3-windows-x64.zip`, `Synlexa-Studio-v0.4.3-windows-arm64.zip` |
-| Linux (`x86_64` / `aarch64`) | `Synlexa-Studio-v0.4.3-universal-x86_64.AppImage`, `Synlexa-Studio-v0.4.3-linux-amd64.deb`, `Synlexa-Studio-v0.4.3-linux-arm64.deb`, `synlexa-studio-v0.4.3-x86_64-unknown-linux-gnu.tar.gz`, `synlexa-studio-v0.4.3-aarch64-unknown-linux-gnu.tar.gz` |
+| macOS Universal (Apple Silicon + Intel) | `Synlexa-Studio-v0.4.4-universal-apple-darwin.dmg`, `synlexa-studio-v0.4.4-universal-apple-darwin.tar.gz` |
+| Windows (`x64` / `arm64`) | `Synlexa-Studio-v0.4.4-windows-x64.zip`, `Synlexa-Studio-v0.4.4-windows-arm64.zip` |
+| Linux (`x86_64` / `aarch64`) | `Synlexa-Studio-v0.4.4-universal-x86_64.AppImage`, `Synlexa-Studio-v0.4.4-linux-amd64.deb`, `Synlexa-Studio-v0.4.4-linux-arm64.deb`, `synlexa-studio-v0.4.4-x86_64-unknown-linux-gnu.tar.gz`, `synlexa-studio-v0.4.4-aarch64-unknown-linux-gnu.tar.gz` |
 
 Verify downloaded archives with:
 

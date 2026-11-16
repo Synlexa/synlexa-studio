@@ -1,6 +1,6 @@
 [package]
 name = "synlexa-studio-tauri"
-version = "0.4.3"
+version = "0.4.4"
 description = "Synlexa Studio Desktop (Tauri v2 scaffold, Research-Use-Only)"
 authors = ["Atil Yali"]
 license = "Apache-2.0"

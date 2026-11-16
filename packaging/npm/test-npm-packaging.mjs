@@ -69,6 +69,7 @@ try {
     };
 
     execFileSync(process.execPath, [cliEntry, 'install-desktop'], { env: sandboxEnv, stdio: 'pipe' });
+    assert.ok(existsSync(join(fakeHome, '.synlexa-studio', `.desktop-setup-v${rootVersion}`)));
 
     if (process.platform === 'darwin') {
       const appPath = join(fakeHome, 'Applications', 'Synlexa Studio.app');
@@ -82,6 +83,23 @@ try {
       assert.ok(existsSync(appDesktop));
       assert.ok(existsSync(desktopShortcut));
       assert.match(readFileSync(desktopShortcut, 'utf8'), /Name=Synlexa Studio/);
+    }
+
+    execFileSync(process.execPath, [cliEntry, 'uninstall-desktop'], { env: sandboxEnv, stdio: 'pipe' });
+    assert.ok(!existsSync(join(fakeHome, '.synlexa-studio', `.desktop-setup-v${rootVersion}`)));
+
+    // Verify npm v12+ first-launch setup runs automatically when postinstall was skipped
+    const shortcutMod = await import(join(root, 'dist/npm/synlexa-studio/scripts/desktop-shortcut.mjs'));
+    const savedEnv = { ...process.env };
+    Object.assign(process.env, sandboxEnv);
+    try {
+      const firstRunCreated = await shortcutMod.ensureStudioDesktopSetup({ force: false, quiet: true });
+      assert.ok(firstRunCreated.length > 0);
+      assert.ok(existsSync(join(fakeHome, '.synlexa-studio', `.desktop-setup-v${rootVersion}`)));
+      const secondRunCreated = await shortcutMod.ensureStudioDesktopSetup({ force: false, quiet: true });
+      assert.equal(secondRunCreated.length, 0);
+    } finally {
+      process.env = savedEnv;
     }
 
     execFileSync(process.execPath, [cliEntry, 'uninstall-desktop'], { env: sandboxEnv, stdio: 'pipe' });

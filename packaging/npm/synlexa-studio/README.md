@@ -11,7 +11,7 @@
 ### macOS (Apple Silicon M1–M4 & Intel)
 
 - **Drag-and-Drop Installer (No Terminal Needed):**  
-  Download [`Synlexa-Studio-v0.4.3-universal-apple-darwin.dmg`](https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.3/Synlexa-Studio-v0.4.3-universal-apple-darwin.dmg), double-click it, and drag **Synlexa Studio** into **Applications**.
+  Download [`Synlexa-Studio-v0.4.3-universal-apple-darwin.dmg`](https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.4/Synlexa-Studio-v0.4.3-universal-apple-darwin.dmg), double-click it, and drag **Synlexa Studio** into **Applications**.
 - **Or One-Line Terminal Install (Adds Desktop + Applications Icon Automatically):**
   ```sh
   curl -fsSL https://www.synlexa.com/install.sh | sh
@@ -45,15 +45,18 @@ curl -fsSL https://www.synlexa.com/install.sh | sh
 
 ## Installing via `npm`
 
-> **Tip:** Direct `.tgz` installation requires **no GitHub login or token** and works identically on macOS, Windows, and Linux:
-
 ```sh
-npm install -g https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.3/synlexa-studio-0.4.3.tgz
+npm install -g @synlexa/studio
+synlexa-studio
 ```
 
-Or install from **GitHub Packages** (`@synlexa/studio`) if you have a GitHub token with `read:packages` in `~/.npmrc`:
+On npm v12+ (where install-time lifecycle scripts default off), launching `synlexa-studio` the first time (or passing `--allow-scripts`) automatically verifies the native desktop runtime for your computer and adds the clickable **Synlexa Studio** Desktop & Applications/Start Menu icon.
+
+*(Alternative: install the release tarball directly or via GitHub Packages with `read:packages`:)*
 
 ```sh
+npm install -g https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.4/synlexa-studio-0.4.4.tgz
+# Or GitHub Packages:
 npm install -g @synlexa/studio --@synlexa:registry=https://npm.pkg.github.com
 ```
 

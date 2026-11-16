@@ -4,6 +4,15 @@ All notable changes to Synlexa Studio are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.4] - 2026-11-16
+
+### Added
+- **npm v12+ First-Launch Desktop Icon Setup (`ensureStudioDesktopSetup`)**: Automatically provisions the SHA-256-verified native desktop runtime and Desktop / Applications / Start Menu shortcut on first GUI launch in `bin/synlexa-studio.mjs` (in addition to `postinstall.mjs` and `synlexa-studio install-desktop`), ensuring Desktop icons work even when npm v12 disables lifecycle scripts by default (`allowScripts: false`).
+
+### Changed
+- **npm OIDC Trusted Publishing (`release.yml`)**: Upgraded `publish-release` to Node 24 (`id-token: write`) with clean OIDC Trusted Publishing for `https://registry.npmjs.org` (eliminating `NPM_TOKEN` / 2FA-bypass secrets) and normalized `repository.url` to `git+https://github.com/Synlexa/synlexa-studio.git`.
+- **Direct `npm install -g @synlexa/studio` Docs**: Updated `README.md`, `docs/installation.md`, and package READMEs now that `@synlexa/studio` and `@synlexa/wasm-bridge` are live on `npmjs.org`.
+
 ## [0.4.3] - 2026-11-16
 
 ### Changed

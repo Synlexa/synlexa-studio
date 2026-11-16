@@ -5,8 +5,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import http from 'node:http';
 import readline from 'node:readline';
 import {
+  ensureStudioDesktopSetup,
   findNativeBinary,
-  installDesktopShortcut,
   PKG_ROOT,
   readPackageMeta,
   uninstallDesktopShortcut,
@@ -138,6 +138,7 @@ async function runWasmStdioMcp() {
 }
 
 async function launchStudioWebHost(args) {
+  await ensureStudioDesktopSetup({ force: false });
   const nativeHost = findNativeBinary('synlexa-studio-desktop-native');
   const distDir = join(pkgRoot, 'web-dist');
   const iconIcns = join(pkgRoot, 'assets', 'icon.icns');
@@ -207,9 +208,9 @@ if (
 ) {
   await launchStudioWebHost(sub === 'launch' || sub === 'app' ? args.slice(1) : args);
 } else if (sub === 'install-desktop' || sub === '--install-desktop' || sub === 'desktop-icon') {
-  const created = installDesktopShortcut();
+  const created = await ensureStudioDesktopSetup({ force: true, quiet: true });
   if (created.length === 0) {
-    console.log('Desktop shortcut installation is unsupported on this platform.');
+    console.log('Desktop shortcut installation was skipped or is unsupported on this platform.');
   } else {
     console.log('Synlexa Studio desktop icon installed:');
     for (const p of created) console.log(`  - ${p}`);

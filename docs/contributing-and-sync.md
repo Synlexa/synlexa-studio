@@ -53,6 +53,6 @@ Pushing to `main` alone only syncs source code and runs CI; **desktop installers
 | Repository | Secret Name | Purpose |
 |---|---|---|
 | `Synlexa/synlexa-studio` (set here only) | `HOMEBREW_TAP_TOKEN` | Classic PAT (`repo` scope) pushing formula/cask updates to both `Synlexa/homebrew-tap` and `nanobiolog/homebrew-tap` on `v*` tags |
-| `Synlexa/synlexa-studio` (optional) | `NPM_TOKEN` | Automation token for `registry.npmjs.org` (`@synlexa/*` also auto-publishes to GitHub Packages via built-in `GITHUB_TOKEN` with `packages: write`) |
+| `Synlexa/synlexa-studio` (OIDC) | *No static secret* (`id-token: write`) | Publishes `@synlexa/studio` and `@synlexa/wasm-bridge` to `registry.npmjs.org` via npm Trusted Publishing (`release.yml`); GitHub Packages publishes via `GITHUB_TOKEN` (`packages: write`) |
 | `nanobiolog/synlexa-studio` (Private) | `SYNLEXA_PUBLIC_SYNC_TOKEN` | Fine-grained PAT (`Synlexa/synlexa-studio` scoped: `Contents: Read and write`, `Workflows: Read and write`) syncing private ↔ public |
 | `nanobiolog/synlexa-studio` (Private) | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | Deploys `studio.synlexa.com` + `/releases/*` automatically on `v*` tags via `private-deploy-cloud.yml` |
