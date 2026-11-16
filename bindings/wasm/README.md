@@ -13,7 +13,7 @@ npm install @synlexa/wasm-bridge
 npm install @synlexa/wasm-bridge --@synlexa:registry=https://npm.pkg.github.com
 
 # Or direct release tarball:
-npm install https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.4/synlexa-wasm-bridge-0.4.4.tgz
+npm install https://github.com/Synlexa/synlexa-studio/releases/download/v0.4.5/synlexa-wasm-bridge-0.4.5.tgz
 ```
 
 ## Example Usage

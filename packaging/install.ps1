@@ -1,6 +1,6 @@
 ﻿$ErrorActionPreference = "Stop"
 
-$Version = if ($env:SYNLEXA_VERSION) { $env:SYNLEXA_VERSION } else { "0.4.4" }
+$Version = if ($env:SYNLEXA_VERSION) { $env:SYNLEXA_VERSION } else { "0.4.5" }
 $InstallDir = if ($env:SYNLEXA_INSTALL_DIR) { $env:SYNLEXA_INSTALL_DIR } else { Join-Path $HOME ".synlexa-studio\runtime" }
 $PrimaryReleasesBase = if ($env:SYNLEXA_RELEASES_BASE) { $env:SYNLEXA_RELEASES_BASE } else { "https://github.com/Synlexa/synlexa-studio/releases/download/v$Version" }
 $MirrorReleasesBase = "https://studio.synlexa.com/releases"

@@ -1,6 +1,6 @@
 {
   "name": "@synlexa/studio",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "Synlexa Studio Desktop App & Launcher for macOS (Apple Silicon & Intel), Windows, and Linux — adds a clickable Synlexa Studio Desktop icon and CLI/MCP runtime (Research-Use-Only).",
   "license": "Apache-2.0",
   "repository": {

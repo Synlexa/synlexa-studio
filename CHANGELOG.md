@@ -4,6 +4,11 @@ All notable changes to Synlexa Studio are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.5] - 2026-11-16
+
+### Fixed
+- **macOS Keychain prompt on every launch**: The API-key vault now stores its AES master key as raw bytes in IndexedDB instead of a structured-cloned `CryptoKey`, so WKWebView no longer creates the "Synlexa Studio WebCrypto Master Key" Keychain item. API keys saved with earlier versions must be re-entered once.
+
 ## [0.4.4] - 2026-11-16
 
 ### Added

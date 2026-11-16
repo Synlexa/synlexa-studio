@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-VERSION="${SYNLEXA_VERSION:-0.4.4}"
+VERSION="${SYNLEXA_VERSION:-0.4.5}"
 INSTALL_DIR="${SYNLEXA_INSTALL_DIR:-$HOME/.synlexa-studio/runtime}"
 BIN_DIR="${SYNLEXA_BIN_DIR:-$HOME/.local/bin}"
 PRIMARY_RELEASES_BASE="${SYNLEXA_RELEASES_BASE:-https://github.com/Synlexa/synlexa-studio/releases/download/v${VERSION}}"
