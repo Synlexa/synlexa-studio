@@ -40,7 +40,8 @@ const DB_NAME = 'state.vscdb';
 const DB_VERSION = 1;
 const ITEM_TABLE = 'ItemTable';
 const KEY_STORE = 'VaultKeyStore';
-const MASTER_KEY_ID = 'synlexa.studio.master.aes256gcm';
+// Legacy CryptoKey record id (never read: reading triggers the Keychain prompt).
+const MASTER_KEY_RAW_ID = 'synlexa.studio.master.aes256gcm.raw.v2';
 const SECRET_PREFIX = 'secret://synlexa.studio.vault/';
 const CUSTOM_SECRET_PREFIX = 'secret://synlexa.studio.vault/custom/';
 
@@ -192,23 +193,38 @@ function idbReq<T>(req: IDBRequest<T>): Promise<T> {
   });
 }
 
+/**
+ * The AES master key is stored as raw bytes (base64) rather than as a
+ * structured-cloned CryptoKey. Persisting a CryptoKey in IndexedDB makes
+ * WKWebView wrap it with a "WebCrypto Master Key" Keychain item, which makes
+ * macOS ask for the login password on every launch. Raw storage avoids that
+ * prompt; the imported key remains non-extractable at runtime.
+ */
 async function getOrCreateMasterKey(db: IDBDatabase): Promise<CryptoKey | null> {
   const subtle = globalThis.crypto?.subtle;
   if (!subtle) return null;
   try {
     const readTx = db.transaction(KEY_STORE, 'readonly');
-    const existing = (await idbReq<{ id: string; key: CryptoKey } | undefined>(
-      readTx.objectStore(KEY_STORE).get(MASTER_KEY_ID),
+    const existing = (await idbReq<{ id: string; raw?: string } | undefined>(
+      readTx.objectStore(KEY_STORE).get(MASTER_KEY_RAW_ID),
     )) ?? null;
-    if (existing?.key) return existing.key;
+    if (existing?.raw) {
+      const bytes = Uint8Array.from(atob(existing.raw), (c) => c.charCodeAt(0));
+      return await subtle.importKey('raw', bytes, { name: 'AES-GCM' }, false, [
+        'encrypt',
+        'decrypt',
+      ]);
+    }
 
-    const generated = await subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+    const bytes = globalThis.crypto.getRandomValues(new Uint8Array(32));
+    let bin = '';
+    for (const b of bytes) bin += String.fromCharCode(b);
+    const writeTx = db.transaction(KEY_STORE, 'readwrite');
+    await idbReq(writeTx.objectStore(KEY_STORE).put({ id: MASTER_KEY_RAW_ID, raw: btoa(bin) }));
+    return await subtle.importKey('raw', bytes, { name: 'AES-GCM' }, false, [
       'encrypt',
       'decrypt',
     ]);
-    const writeTx = db.transaction(KEY_STORE, 'readwrite');
-    await idbReq(writeTx.objectStore(KEY_STORE).put({ id: MASTER_KEY_ID, key: generated }));
-    return generated;
   } catch {
     return null;
   }
