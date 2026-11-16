@@ -56,6 +56,8 @@ checkExact('packaging/install.sh', matchGroup('packaging/install.sh', /SYNLEXA_V
 checkExact('packaging/install.ps1', matchGroup('packaging/install.ps1', /else\s*\{\s*"([^"]+)"\s*\}/));
 checkExact('packaging/homebrew/Formula/synlexa-studio.rb', matchGroup('packaging/homebrew/Formula/synlexa-studio.rb', /^\s*version\s+"([^"]+)"/m));
 checkExact('packaging/homebrew/Casks/synlexa-studio.rb', matchGroup('packaging/homebrew/Casks/synlexa-studio.rb', /^\s*version\s+"([^"]+)"/m));
+checkExact('packaging/npm/synlexa-studio/README.md', matchGroup('packaging/npm/synlexa-studio/README.md', /synlexa-studio-([0-9]+\.[0-9]+\.[0-9]+)\.tgz/));
+checkExact('bindings/wasm/README.md', matchGroup('bindings/wasm/README.md', /synlexa-wasm-bridge-([0-9]+\.[0-9]+\.[0-9]+)\.tgz/));
 checkExact('CITATION.cff', matchGroup('CITATION.cff', /^version:\s*"([^"]+)"/m));
 
 const releaseYml = read('.github/workflows/release.yml');

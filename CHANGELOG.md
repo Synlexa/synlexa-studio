@@ -4,6 +4,12 @@ All notable changes to Synlexa Studio are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2026-11-16
+
+### Changed
+- **Simplified npm & GitHub Packages UX (`@synlexa/studio` & `@synlexa/wasm-bridge` only)**: Removed the 6 OS/CPU helper npm packages (`@synlexa/studio-darwin-*`, `linux-*`, `win32-*`) from the release matrix so users only see `@synlexa/studio` (all-in-one desktop app for macOS, Windows & Linux) and `@synlexa/wasm-bridge` (JS/TS SDK), each with dedicated plain-English install instructions (`packaging/npm/synlexa-studio/README.md`, `bindings/wasm/README.md`).
+- **SHA-256 Verified Runtime Auto-Install in `postinstall.mjs`**: Global `@synlexa/studio` npm installs now automatically fetch and verify the native desktop binary for macOS/Windows/Linux against `SHA256SUMS.txt` (falling back gracefully to the bundled Wasm/Web runtime offline) before creating the Desktop & Applications/Start Menu icon.
+
 ## [0.4.2] - 2026-11-16
 
 ### Added

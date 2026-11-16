@@ -38,22 +38,34 @@ export function readPackageMeta() {
 export function findNativeBinary(name, pkgRoot = PKG_ROOT) {
   const pkgName = PLATFORM_MAP[`${process.platform}-${process.arch}`];
   const ext = process.platform === 'win32' ? '.exe' : '';
+  const names =
+    process.platform === 'win32' && name === 'synlexa-studio-desktop-native'
+      ? ['synlexa-studio-desktop-native.exe', 'synlexa-studio.exe']
+      : [`${name}${ext}`];
+
   if (pkgName) {
     try {
       const pkgJsonPath = require.resolve(`${pkgName}/package.json`);
-      const candidate = join(dirname(pkgJsonPath), 'bin', `${name}${ext}`);
-      if (existsSync(candidate)) return candidate;
+      for (const binName of names) {
+        const candidate = join(dirname(pkgJsonPath), 'bin', binName);
+        if (existsSync(candidate)) return candidate;
+      }
     } catch {
       // Optional native package not installed; try local/home runtime fallbacks
     }
   }
-  const localCandidate = join(pkgRoot, 'bin', `${name}${ext}`);
-  if (existsSync(localCandidate)) return localCandidate;
+  for (const binName of names) {
+    const localCandidate = join(pkgRoot, 'bin', binName);
+    if (existsSync(localCandidate)) return localCandidate;
+  }
 
   const home = process.env.HOME || process.env.USERPROFILE || '';
-  if (home) {
-    const homeCandidate = join(home, '.synlexa-studio', 'runtime', 'bin', `${name}${ext}`);
-    if (existsSync(homeCandidate)) return homeCandidate;
+  const runtimeDir = process.env.SYNLEXA_INSTALL_DIR || (home ? join(home, '.synlexa-studio', 'runtime') : '');
+  if (runtimeDir) {
+    for (const binName of names) {
+      const homeCandidate = join(runtimeDir, 'bin', binName);
+      if (existsSync(homeCandidate)) return homeCandidate;
+    }
   }
   return null;
 }

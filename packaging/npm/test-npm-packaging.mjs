@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Smoke test for npm package assembly, CLI flags, and sandboxed Desktop shortcut creation.
+ * Smoke test for @synlexa/studio & @synlexa/wasm-bridge assembly, CLI flags,
+ * package README clarity, and sandboxed Desktop shortcut creation.
  */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -15,21 +16,6 @@ const rootVersion = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 
 const tmpRoot = mkdtempSync(join(tmpdir(), 'synlexa-npm-test-'));
 try {
-  const binsDir = join(tmpRoot, 'platform-bins');
-  for (const [key, ext] of [
-    ['darwin-arm64', ''],
-    ['darwin-x64', ''],
-    ['linux-x64-gnu', ''],
-    ['linux-arm64-gnu', ''],
-    ['win32-x64-msvc', '.exe'],
-    ['win32-arm64-msvc', '.exe'],
-  ]) {
-    const dir = join(binsDir, key);
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, `studio-cli${ext}`), '#!/bin/sh\necho mock\n', 'utf8');
-    writeFileSync(join(dir, `synlexa-studio-desktop-native${ext}`), '#!/bin/sh\necho mock\n', 'utf8');
-  }
-
   // Ensure web-dist fallback exists for assembly test even if web build wasn't run locally
   const webDist = join(tmpRoot, 'web-dist');
   mkdirSync(webDist, { recursive: true });
@@ -37,38 +23,29 @@ try {
 
   execFileSync(
     process.execPath,
-    [
-      join(root, 'packaging/npm/build-npm-packages.mjs'),
-      '--platform-bins-dir',
-      binsDir,
-      '--web-dist',
-      webDist,
-    ],
+    [join(root, 'packaging/npm/build-npm-packages.mjs'), '--web-dist', webDist],
     { cwd: root, stdio: 'pipe' },
   );
 
   const mainPkg = JSON.parse(readFileSync(join(root, 'dist/npm/synlexa-studio/package.json'), 'utf8'));
   assert.equal(mainPkg.name, '@synlexa/studio');
   assert.equal(mainPkg.version, rootVersion);
+  assert.equal(mainPkg.optionalDependencies, undefined);
+  assert.match(mainPkg.description, /macOS/i);
   assert.ok(existsSync(join(root, 'dist/npm/synlexa-studio/assets/icon.icns')));
   assert.ok(existsSync(join(root, 'dist/npm/synlexa-studio/assets/icon.ico')));
   assert.ok(existsSync(join(root, 'dist/npm/synlexa-studio/assets/icon.png')));
 
-  for (const dirName of [
-    'studio-darwin-arm64',
-    'studio-darwin-x64',
-    'studio-linux-x64-gnu',
-    'studio-linux-arm64-gnu',
-    'studio-win32-x64-msvc',
-    'studio-win32-arm64-msvc',
-    'wasm-bridge',
-    'synlexa-studio',
-  ]) {
-    const pkgJson = JSON.parse(readFileSync(join(root, 'dist/npm', dirName, 'package.json'), 'utf8'));
-    assert.ok(pkgJson.name.startsWith('@synlexa/'), `${dirName} must be scoped under @synlexa/`);
-    assert.equal(pkgJson.version, rootVersion);
-    assert.equal(pkgJson.license, 'Apache-2.0');
-  }
+  const studioReadme = readFileSync(join(root, 'dist/npm/synlexa-studio/README.md'), 'utf8');
+  assert.match(studioReadme, /macOS \(Apple Silicon M1–M4 & Intel\)/);
+  assert.match(studioReadme, new RegExp(`v${rootVersion}`));
+
+  const bridgePkg = JSON.parse(readFileSync(join(root, 'dist/npm/wasm-bridge/package.json'), 'utf8'));
+  assert.equal(bridgePkg.name, '@synlexa/wasm-bridge');
+  assert.equal(bridgePkg.version, rootVersion);
+  assert.equal(bridgePkg.license, 'Apache-2.0');
+  const bridgeReadme = readFileSync(join(root, 'dist/npm/wasm-bridge/README.md'), 'utf8');
+  assert.match(bridgeReadme, /Developer WebAssembly SDK/);
 
   const cliEntry = join(root, 'dist/npm/synlexa-studio/bin/synlexa-studio.mjs');
   assert.equal(execFileSync(process.execPath, [cliEntry, '--version'], { encoding: 'utf8' }).trim(), rootVersion);
@@ -86,6 +63,7 @@ try {
       HOME: fakeHome,
       XDG_DATA_HOME: join(fakeHome, '.local', 'share'),
       SYNLEXA_DESKTOP_DIR: fakeDesktop,
+      SYNLEXA_SKIP_RUNTIME_DOWNLOAD: '1',
       CI: '',
       GITHUB_ACTIONS: '',
     };
@@ -118,6 +96,5 @@ try {
   console.log(`npm packaging & desktop icon smoke tests passed (v${rootVersion}).`);
 } finally {
   rmSync(tmpRoot, { recursive: true, force: true });
-  // Restore standard build-npm-packages output without mock platform binaries
   execFileSync(process.execPath, [join(root, 'packaging/npm/build-npm-packages.mjs')], { cwd: root, stdio: 'pipe' });
 }

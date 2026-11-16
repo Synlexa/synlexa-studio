@@ -1,7 +1,7 @@
 class SynlexaStudio < Formula
   desc "Deterministic structural biology, peptide, CRISPR, SMILES, and MCP workbench"
   homepage "https://www.synlexa.com/download"
-  version "0.4.2"
+  version "0.4.3"
   license "Apache-2.0"
 
   on_macos do

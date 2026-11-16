@@ -1,7 +1,7 @@
 {
   "name": "@synlexa/studio",
-  "version": "0.4.2",
-  "description": "Synlexa Studio desktop/browser launcher, MCP server (stdio & HTTP), and deterministic computational biology engine (Research-Use-Only).",
+  "version": "0.4.3",
+  "description": "Synlexa Studio Desktop App & Launcher for macOS (Apple Silicon & Intel), Windows, and Linux — adds a clickable Synlexa Studio Desktop icon and CLI/MCP runtime (Research-Use-Only).",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -27,14 +27,6 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "optionalDependencies": {
-    "@synlexa/studio-darwin-arm64": "0.4.2",
-    "@synlexa/studio-darwin-x64": "0.4.2",
-    "@synlexa/studio-linux-x64-gnu": "0.4.2",
-    "@synlexa/studio-linux-arm64-gnu": "0.4.2",
-    "@synlexa/studio-win32-x64-msvc": "0.4.2",
-    "@synlexa/studio-win32-arm64-msvc": "0.4.2"
   },
   "keywords": [
     "synlexa",

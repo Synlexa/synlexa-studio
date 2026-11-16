@@ -9,7 +9,7 @@ on:
       version:
         description: "Release version tag (e.g. 0.4.0)"
         required: false
-        default: "0.4.2"
+        default: "0.4.3"
 
 permissions:
   contents: write
@@ -103,13 +103,7 @@ jobs:
           cargo build --release --locked --target aarch64-apple-darwin --manifest-path apps/desktop/native/Cargo.toml
           cargo build --release --locked --target x86_64-apple-darwin --manifest-path apps/desktop/native/Cargo.toml
 
-          mkdir -p dist/macos-universal/bin dist/npm-bins/darwin-arm64 dist/npm-bins/darwin-x64
-          cp target/aarch64-apple-darwin/release/studio-cli dist/npm-bins/darwin-arm64/studio-cli
-          cp apps/desktop/native/target/aarch64-apple-darwin/release/synlexa-studio-desktop-native dist/npm-bins/darwin-arm64/synlexa-studio-desktop-native
-          cp target/x86_64-apple-darwin/release/studio-cli dist/npm-bins/darwin-x64/studio-cli
-          cp apps/desktop/native/target/x86_64-apple-darwin/release/synlexa-studio-desktop-native dist/npm-bins/darwin-x64/synlexa-studio-desktop-native
-          chmod +x dist/npm-bins/darwin-arm64/* dist/npm-bins/darwin-x64/*
-
+          mkdir -p dist/macos-universal/bin
           lipo -create \
             target/aarch64-apple-darwin/release/studio-cli \
             target/x86_64-apple-darwin/release/studio-cli \
@@ -124,7 +118,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [[ "$GITHUB_REF_NAME" == "main" || -z "$VERSION" ]]; then
-            VERSION="${{ github.event.inputs.version || '0.4.2' }}"
+            VERSION="${{ github.event.inputs.version || '0.4.3' }}"
           fi
           echo "REL_VERSION=$VERSION" >> "$GITHUB_ENV"
 
@@ -190,11 +184,6 @@ jobs:
           name: macos-artifacts
           path: dist/out/*
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: npm-platform-bins-macos
-          path: dist/npm-bins
-
   build-linux:
     name: Build Universal Linux (.AppImage, .deb, .tar.gz)
     needs: build-web-and-wasm
@@ -234,7 +223,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [[ "$GITHUB_REF_NAME" == "main" || -z "$VERSION" ]]; then
-            VERSION="${{ github.event.inputs.version || '0.4.2' }}"
+            VERSION="${{ github.event.inputs.version || '0.4.3' }}"
           fi
           cargo build --release --locked --target ${{ matrix.target }} -p studio-cli
           cargo build --release --locked --target ${{ matrix.target }} --manifest-path apps/desktop/native/Cargo.toml
@@ -336,7 +325,7 @@ jobs:
         shell: pwsh
         run: |
           $ver = "${{ github.ref_name }}".TrimStart("v")
-          if (-not $ver -or $ver -eq "main") { $ver = "${{ github.event.inputs.version || '0.4.2' }}" }
+          if (-not $ver -or $ver -eq "main") { $ver = "${{ github.event.inputs.version || '0.4.3' }}" }
           cargo build --release --locked --target ${{ matrix.target }} -p studio-cli
           cargo build --release --locked --target ${{ matrix.target }} --manifest-path apps/desktop/native/Cargo.toml
 
@@ -376,7 +365,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [[ "$GITHUB_REF_NAME" == "main" || -z "$VERSION" ]]; then
-            VERSION="${{ github.event.inputs.version || '0.4.2' }}"
+            VERSION="${{ github.event.inputs.version || '0.4.3' }}"
           fi
           mkdir -p release-files
           find release-staging -type f \( -name "*.dmg" -o -name "*.tar.gz" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.zip" -o -name "*.tgz" \) -exec cp {} release-files/ \;
@@ -428,40 +417,11 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          mkdir -p /tmp/npm-stage/darwin-arm64 /tmp/npm-stage/darwin-x64 \
-                   /tmp/npm-stage/linux-x64-gnu /tmp/npm-stage/linux-arm64-gnu \
-                   /tmp/npm-stage/win32-x64-msvc /tmp/npm-stage/win32-arm64-msvc
-
-          cp release-staging/npm-platform-bins-macos/darwin-arm64/* /tmp/npm-stage/darwin-arm64/
-          cp release-staging/npm-platform-bins-macos/darwin-x64/* /tmp/npm-stage/darwin-x64/
-
-          mkdir -p /tmp/ext-linux-x64 /tmp/ext-linux-arm64 /tmp/ext-win-x64 /tmp/ext-win-arm64
-          tar -xzf "release-files/synlexa-studio-v${VERSION}-x86_64-unknown-linux-gnu.tar.gz" -C /tmp/ext-linux-x64
-          cp /tmp/ext-linux-x64/bin/studio-cli /tmp/ext-linux-x64/bin/synlexa-studio-desktop-native /tmp/npm-stage/linux-x64-gnu/
-
-          tar -xzf "release-files/synlexa-studio-v${VERSION}-aarch64-unknown-linux-gnu.tar.gz" -C /tmp/ext-linux-arm64
-          cp /tmp/ext-linux-arm64/bin/studio-cli /tmp/ext-linux-arm64/bin/synlexa-studio-desktop-native /tmp/npm-stage/linux-arm64-gnu/
-
-          unzip -q "release-files/Synlexa-Studio-v${VERSION}-windows-x64.zip" -d /tmp/ext-win-x64
-          cp /tmp/ext-win-x64/bin/studio-cli.exe /tmp/npm-stage/win32-x64-msvc/studio-cli.exe
-          cp /tmp/ext-win-x64/bin/synlexa-studio.exe /tmp/npm-stage/win32-x64-msvc/synlexa-studio-desktop-native.exe
-
-          unzip -q "release-files/Synlexa-Studio-v${VERSION}-windows-arm64.zip" -d /tmp/ext-win-arm64
-          cp /tmp/ext-win-arm64/bin/studio-cli.exe /tmp/npm-stage/win32-arm64-msvc/studio-cli.exe
-          cp /tmp/ext-win-arm64/bin/synlexa-studio.exe /tmp/npm-stage/win32-arm64-msvc/synlexa-studio-desktop-native.exe
-
           node packaging/npm/build-npm-packages.mjs \
-            --platform-bins-dir /tmp/npm-stage \
             --web-dist release-staging/web-dist-and-npm/apps/web/dist \
             --wasm release-staging/web-dist-and-npm/apps/web/public/wasm/synlexa_bio_core.wasm
 
           PUBLISH_DIRS=(
-            dist/npm/studio-darwin-arm64
-            dist/npm/studio-darwin-x64
-            dist/npm/studio-linux-x64-gnu
-            dist/npm/studio-linux-arm64-gnu
-            dist/npm/studio-win32-x64-msvc
-            dist/npm/studio-win32-arm64-msvc
             dist/npm/wasm-bridge
             dist/npm/synlexa-studio
           )

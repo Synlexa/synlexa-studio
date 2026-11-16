@@ -60,6 +60,12 @@ edit('packaging/install.sh', (s) => s.replace(/(SYNLEXA_VERSION:-)[0-9]+\.[0-9]+
 edit('packaging/install.ps1', (s) => s.replace(/(else\s*\{\s*")[0-9]+\.[0-9]+\.[0-9]+("\s*\})/, `$1${next}$2`));
 edit('packaging/homebrew/Formula/synlexa-studio.rb', (s) => s.replace(/(^\s*version\s+)"[^"]+"/m, `$1"${next}"`));
 edit('packaging/homebrew/Casks/synlexa-studio.rb', (s) => s.replace(/(^\s*version\s+)"[^"]+"/m, `$1"${next}"`));
+edit('packaging/npm/synlexa-studio/README.md', (s) =>
+  s.replace(/\/v[0-9]+\.[0-9]+\.[0-9]+\//g, `/v${next}/`).replace(/-[0-9]+\.[0-9]+\.[0-9]+(-|\.)/g, `-${next}$1`),
+);
+edit('bindings/wasm/README.md', (s) =>
+  s.replace(/\/v[0-9]+\.[0-9]+\.[0-9]+\//g, `/v${next}/`).replace(/-[0-9]+\.[0-9]+\.[0-9]+\.tgz/g, `-${next}.tgz`),
+);
 edit('CITATION.cff', (s) => s.replace(/(^version:\s*)"[^"]+"/m, `$1"${next}"`));
 edit('.github/workflows/release.yml', (s) =>
   s
