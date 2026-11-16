@@ -67,6 +67,7 @@ export type LayoutAction =
   | { type: 'move'; tab: ToolTabId; toGroup: number; index?: number }
   | { type: 'focus_group'; group: number }
   | { type: 'set_split'; split: number }
+  | { type: 'merge_split' }
   | { type: 'reset' };
 
 function findGroup(layout: WorkspaceLayout, tab: ToolTabId): number {
@@ -163,6 +164,16 @@ export function layoutReducer(state: WorkspaceLayout, action: LayoutAction): Wor
       return { ...state, focused: Math.min(action.group, state.groups.length - 1) };
     case 'set_split':
       return { ...state, split: Math.min(0.8, Math.max(0.2, action.split)) };
+    case 'merge_split': {
+      if (state.groups.length < 2) return state;
+      const focusedGroup = state.groups[state.focused] ?? state.groups[0];
+      const mergedTabs = Array.from(new Set(state.groups.flatMap((g) => g.tabs)));
+      return normalize({
+        ...state,
+        groups: [{ tabs: mergedTabs, active: focusedGroup.active ?? mergedTabs[0] ?? null }],
+        focused: 0,
+      });
+    }
     case 'reset':
       return DEFAULT_LAYOUT;
   }

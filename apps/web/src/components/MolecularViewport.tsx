@@ -14,12 +14,14 @@ import {
   Maximize2,
   Ruler,
   SplitSquareHorizontal,
+  X,
 } from 'lucide-react';
 import type {
   CompareStructuresResult,
   InspectStructureResult,
 } from '@synlexa/wasm-bridge';
 import type { ColorMode } from '../lib/colorPalettes';
+import type { Studio3DFocusRequest } from '../lib/studioBridge';
 import {
   MolecularViewportEngine,
   type CameraState,
@@ -50,7 +52,10 @@ interface MolecularViewportProps {
   colorMode: ColorMode;
   onChangeColorMode: (mode: ColorMode) => void;
   focusedSeqId: number | null;
+  focusCameraRequest?: Studio3DFocusRequest | null;
   highlightedSeqIds: Set<number>;
+  highlightSourceLabel?: string | null;
+  onClearHighlights?: () => void;
   paePair: [number, number] | null;
   onPickResidue: (seqId: number) => void;
   onRendererModeDetected?: (mode: 'webgl2' | 'canvas2d-fallback') => void;
@@ -74,7 +79,10 @@ export const MolecularViewport = forwardRef<
     colorMode,
     onChangeColorMode,
     focusedSeqId,
+    focusCameraRequest,
     highlightedSeqIds,
+    highlightSourceLabel,
+    onClearHighlights,
     paePair,
     onPickResidue,
     onRendererModeDetected,
@@ -138,6 +146,33 @@ export const MolecularViewport = forwardRef<
       });
     }
   }, [comparison, scene]);
+
+  const centerOnResidue = (seqId: number) => {
+    const targetNode =
+      scene.refResidues.find((r) => r.seqId === seqId) ??
+      scene.mobResidues.find((r) => r.seqId === seqId);
+    if (!targetNode) return;
+    setCamera((cam) => ({
+      ...cam,
+      distance: Math.max(14, Math.min(cam.distance, 26)),
+      target: [...targetNode.xyz],
+    }));
+  };
+
+  useEffect(() => {
+    if (!focusCameraRequest) return;
+    centerOnResidue(focusCameraRequest.seqId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusCameraRequest?.nonce, focusCameraRequest?.seqId]);
+
+  const focusedNode = useMemo(() => {
+    if (focusedSeqId === null) return null;
+    return (
+      scene.refResidues.find((r) => r.seqId === focusedSeqId) ??
+      scene.mobResidues.find((r) => r.seqId === focusedSeqId) ??
+      null
+    );
+  }, [focusedSeqId, scene.refResidues, scene.mobResidues]);
 
   const applyPreset = (preset: CameraPreset) => {
     if (preset === 'active-site' && scene.activeSiteCenter) {
@@ -525,15 +560,16 @@ export const MolecularViewport = forwardRef<
         <div className="pointer-events-auto flex flex-wrap items-center gap-1 rounded-xl border border-white/10 bg-[#0d121b]/85 p-1 shadow-xl backdrop-blur-md">
           {(
             [
-              ['overlay', 'Overlay'],
-              ['split', 'Split'],
-              ['reference', 'Ref Only'],
-              ['mobile', 'Pred Only'],
+              ['overlay', 'Overlay', 'Superpose both structures on the same coordinates'],
+              ['split', 'Split', 'Show reference and comparison side-by-side'],
+              ['reference', 'Ref Only', 'Show only the experimental/reference structure'],
+              ['mobile', 'Pred Only', 'Show only the predicted/mobile structure'],
             ] as const
-          ).map(([id, label]) => (
+          ).map(([id, label, tip]) => (
             <button
               key={id}
               type="button"
+              title={tip}
               onClick={() => onChangeLayout(id)}
               className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-[0.75rem] font-medium transition ${
                 layout === id
@@ -550,14 +586,15 @@ export const MolecularViewport = forwardRef<
         <div className="pointer-events-auto flex flex-wrap items-center gap-1 rounded-xl border border-white/10 bg-[#0d121b]/85 p-1 shadow-xl backdrop-blur-md">
           {(
             [
-              ['ribbon', 'Ribbon'],
-              ['trace', 'Cα Trace'],
-              ['pocket', 'Active Pocket'],
+              ['ribbon', 'Ribbon', 'Smooth backbone ribbon representation'],
+              ['trace', 'Cα Trace', 'Minimal alpha-carbon wire trace'],
+              ['pocket', 'Active Pocket', 'Highlight co-crystal ligand, metal ion & pocket sidechains'],
             ] as const
-          ).map(([id, label]) => (
+          ).map(([id, label, tip]) => (
             <button
               key={id}
               type="button"
+              title={tip}
               onClick={() => onChangeStyle(id)}
               className={`rounded-lg px-2.5 py-1 text-[0.75rem] font-medium transition ${
                 style === id
@@ -573,15 +610,16 @@ export const MolecularViewport = forwardRef<
         <div className="pointer-events-auto flex flex-wrap items-center gap-1 rounded-xl border border-white/10 bg-[#0d121b]/85 p-1 shadow-xl backdrop-blur-md">
           {(
             [
-              ['identity', 'Identity'],
-              ['plddt', 'pLDDT'],
-              ['bfactor', 'B-Factor (Å²)'],
-              ['deviation', 'Δd (Å)'],
+              ['identity', 'Identity', 'Color by structure (blue = reference, green = prediction)'],
+              ['plddt', 'pLDDT', 'Color by AlphaFold confidence score (0–100)'],
+              ['bfactor', 'B-Factor (Å²)', 'Color by crystallographic B-factor flexibility'],
+              ['deviation', 'Δd (Å)', 'Color by per-residue Cα distance between structures'],
             ] as const
-          ).map(([id, label]) => (
+          ).map(([id, label, tip]) => (
             <button
               key={id}
               type="button"
+              title={tip}
               onClick={() => onChangeColorMode(id)}
               className={`rounded-lg px-2.5 py-1 text-[0.75rem] font-medium transition ${
                 colorMode === id
@@ -594,6 +632,49 @@ export const MolecularViewport = forwardRef<
           ))}
         </div>
       </div>
+
+      {/* Live Synced Focus / Highlight Pill */}
+      {(focusedNode || highlightedSeqIds.size > 0) && (
+        <div
+          data-viewport-ui
+          className="pointer-events-none absolute top-14 right-2.5 left-2.5 flex flex-wrap items-center gap-1.5"
+        >
+          {focusedNode && (
+            <button
+              type="button"
+              onClick={() => centerOnResidue(focusedNode.seqId)}
+              title="Click to center 3D camera on this residue"
+              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-amber-400/40 bg-[#0d121b]/85 px-2.5 py-1 font-mono text-[0.6875rem] text-amber-200 shadow backdrop-blur-md hover:border-amber-300"
+            >
+              <Crosshair className="h-3 w-3 text-amber-300" />
+              <span>
+                {focusedNode.resName3} {focusedNode.seqId}
+                {focusedNode.deviationA != null ? ` · Δd ${focusedNode.deviationA.toFixed(2)} Å` : ''}
+                {focusedNode.plddt != null ? ` · pLDDT ${focusedNode.plddt.toFixed(0)}` : ''}
+              </span>
+              <span className="text-amber-300/75">Center</span>
+            </button>
+          )}
+          {highlightedSeqIds.size > 0 && (
+            <span className="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-pink-400/40 bg-[#0d121b]/85 px-2.5 py-1 font-mono text-[0.6875rem] text-pink-200 shadow backdrop-blur-md">
+              <span className="h-2 w-2 rounded-full bg-pink-400" />
+              <span>
+                {highlightedSeqIds.size} highlighted{highlightSourceLabel ? ` (${highlightSourceLabel})` : ''}
+              </span>
+              {onClearHighlights && (
+                <button
+                  type="button"
+                  onClick={onClearHighlights}
+                  title="Clear 3D highlights"
+                  className="rounded p-0.5 text-pink-300 hover:bg-white/10 hover:text-white"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Bottom Controls & Legend */}
       <div

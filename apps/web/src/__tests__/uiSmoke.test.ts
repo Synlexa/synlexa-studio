@@ -10,9 +10,15 @@ import { PeptideWorkbench } from '../components/PeptideWorkbench';
 import { CrisprWorkbench } from '../components/CrisprWorkbench';
 import { ChemistryWorkbench } from '../components/ChemistryWorkbench';
 import { RamachandranPanel } from '../components/RamachandranPanel';
+import { ResultsView } from '../components/ResultsView';
+import { WorkflowCanvas } from '../components/WorkflowCanvas';
+import { ComputeNodesView } from '../components/ComputeNodesView';
+import { PluginsView } from '../components/PluginsView';
+import { MoleculeSketcher2D } from '../components/MoleculeSketcher2D';
 import { OnboardingLaunchpad } from '../components/OnboardingLaunchpad';
 import { SimpleStepperBar } from '../components/SimpleStepperBar';
 import { GeminiAgentPanel } from '../components/GeminiAgentPanel';
+import type { Studio3DBridge } from '../lib/studioBridge';
 
 describe('UI Component Server Render Smoke Tests (RUO)', () => {
   it('renders TopHeaderBar and all 4 biology/chemistry workbench tabs with real Wasm data', async () => {
@@ -147,6 +153,113 @@ describe('UI Component Server Render Smoke Tests (RUO)', () => {
     );
     expect(chemHtml).toContain('C4H6N4O3S2');
     expect(chemHtml).toContain('AZM');
+
+    const testBridge: Studio3DBridge = {
+      activeProjectName: 'CA II Test',
+      refLabel: '3HS4.cif',
+      refChain: 'A',
+      mobLabel: 'AF-P00918-F1-model_v6.cif',
+      mobChain: 'A',
+      hasRef: true,
+      hasMob: true,
+      hasComparison: true,
+      focusedSeqId: 94,
+      activeHighlight: null,
+      projectMolecules: [{ id: 'pm1', name: 'Dorzolamide', smiles: 'CCN[C@H]1C[C@@H](C)S(=O)(=O)c2sc(S(N)(=O)=O)cc12', addedAtUtc: '2026-11-16T00:00:00Z' }],
+      projectStructures: [],
+      coCrystalLigands: [{ resName: 'AZM', chainId: 'A', seqId: 261, atomCount: 13, centroid: [0, 0, 0] }],
+      dockingBox: { center: [1, 2, 3], size: [22, 22, 22], sourceLabel: 'Ligand AZM A:261' },
+      focusIn3D: () => {},
+      highlightIn3D: () => {},
+      clearHighlights3D: () => {},
+      setStyle3D: () => {},
+      setColorMode3D: () => {},
+      openTab: () => {},
+      openDatabases: () => {},
+      loadExample: () => {},
+      saveMoleculeToProject: () => {},
+      saveMoleculeToLibrary: () => {},
+      savePeptideToProject: () => {},
+      saveCrisprToProject: () => {},
+      syncPeptideFromChain: () => {},
+      sendMutationToPeptide: () => {},
+      sendResidueToCrispr: () => {},
+      sendResidueToRamachandran: () => {},
+    };
+
+    const bridgedChemHtml = renderToStaticMarkup(
+      createElement(ChemistryWorkbench, {
+        state: {
+          selectedPresetId: 'azm',
+          name: 'Acetazolamide',
+          smiles: 'CC(=O)Nc1nnc(S(N)(=O)=O)s1',
+        },
+        dispatch: () => {},
+        result: chem,
+        comparison: cmp,
+        error: null,
+        onFocusResidue: () => {},
+        bridge: testBridge,
+      }),
+    );
+    expect(bridgedChemHtml).toContain('Highlight Pocket in 3D');
+    expect(bridgedChemHtml).toContain('Save to Project');
+
+    const bridgedPepHtml = renderToStaticMarkup(
+      createElement(PeptideWorkbench, {
+        state: {
+          sequence: seq,
+          mutationsInput: 'H94A',
+          mutations: ['H94A'],
+          sliceStart: 1,
+          sliceEnd: seq.length,
+          focusSeqId: 94,
+        },
+        dispatch: () => {},
+        result: pep,
+        error: null,
+        onFocusResidue: () => {},
+        bridge: testBridge,
+      }),
+    );
+    expect(bridgedPepHtml).toContain('At #94:');
+    expect(bridgedPepHtml).toContain('Show in 3D');
+
+    const bridgedCrisprHtml = renderToStaticMarkup(
+      createElement(CrisprWorkbench, {
+        state: {
+          transcriptId: 'NM_000067.3',
+          customDna: '',
+          useCustomDna: false,
+          targetCodonIndex: 94,
+          baseEditOffset: 0,
+          newBase: 'G',
+          nuclease: 'SpCas9',
+        },
+        dispatch: () => {},
+        result: crispr,
+        error: null,
+        onFocusResidue: () => {},
+        bridge: testBridge,
+      }),
+    );
+    expect(bridgedCrisprHtml).toContain('Focus Res #94 in 3D');
+    expect(bridgedCrisprHtml).toContain('Test H94');
+
+    const bridgedSeqHtml = renderToStaticMarkup(
+      createElement(SequenceDeviationTrack, {
+        comparison: cmp,
+        refInspect: refInsp,
+        mobInspect: mobInsp,
+        refChainId: 'A',
+        mobChainId: 'A',
+        focusedSeqId: 94,
+        onFocusResidue: () => {},
+        bridge: testBridge,
+      }),
+    );
+    expect(bridgedSeqHtml).toContain('Bar Metric:');
+    expect(bridgedSeqHtml).toContain('Focus in 3D');
   });
 
   it('renders Simple Mode stepper, Quick-Start launchpad, Ramachandran Wasm panel, and Gemini Agent panel', async () => {
@@ -229,5 +342,122 @@ describe('UI Component Server Render Smoke Tests (RUO)', () => {
       }),
     );
     expect(agentHtml).toContain('RUO assistant');
+
+    const mockBridge: Studio3DBridge = {
+      activeProjectName: 'CA II Workspace',
+      refLabel: '3HS4.cif',
+      refChain: 'A',
+      mobLabel: 'AF-P00918-F1-model_v6.cif',
+      mobChain: 'A',
+      hasRef: true,
+      hasMob: true,
+      hasComparison: true,
+      focusedSeqId: 94,
+      activeHighlight: { source: 'Ramachandran Outliers', seqIds: [176, 252] },
+      projectMolecules: [{ id: 'm1', name: 'Acetazolamide', smiles: 'CC(=O)Nc1nnc(S(N)(=O)=O)s1', addedAtUtc: '2026-11-16T00:00:00Z' }],
+      projectStructures: [],
+      coCrystalLigands: [{ resName: 'AZM', chainId: 'A', seqId: 261, atomCount: 13, centroid: [0, 0, 0] }],
+      dockingBox: { center: [1, 2, 3], size: [22, 22, 22], sourceLabel: 'Ligand AZM A:261' },
+      focusIn3D: () => {},
+      highlightIn3D: () => {},
+      clearHighlights3D: () => {},
+      setStyle3D: () => {},
+      setColorMode3D: () => {},
+      openTab: () => {},
+      openDatabases: () => {},
+      loadExample: () => {},
+      saveMoleculeToProject: () => {},
+      saveMoleculeToLibrary: () => {},
+      savePeptideToProject: () => {},
+      saveCrisprToProject: () => {},
+      syncPeptideFromChain: () => {},
+      sendMutationToPeptide: () => {},
+      sendResidueToCrispr: () => {},
+      sendResidueToRamachandran: () => {},
+    };
+
+    const bridgedRamaHtml = renderToStaticMarkup(
+      createElement(RamachandranPanel, {
+        refLabel: '3HS4.cif',
+        refChain: 'A',
+        mobLabel: 'AF-P00918-F1-model_v6.cif',
+        mobChain: 'A',
+        activeSource: 'reference',
+        onChangeSource: () => {},
+        result: rama,
+        error: null,
+        focusedSeqId: 94,
+        onFocusResidue: () => {},
+        simpleMode: true,
+        bridge: mockBridge,
+      }),
+    );
+    expect(bridgedRamaHtml).toContain('@container');
+    expect(bridgedRamaHtml).toContain('Highlight Outliers in 3D');
+    expect(bridgedRamaHtml).toContain('Focus in 3D');
+
+    const sketcherHtml = renderToStaticMarkup(
+      createElement(MoleculeSketcher2D, {
+        initialMolblock: null,
+        activeSmiles: 'CC(=O)Nc1nnc(S(N)(=O)=O)s1',
+        activeName: 'Acetazolamide',
+        onCommitMolblock: () => {},
+      }),
+    );
+    expect(sketcherHtml).toContain('-COOH');
+    expect(sketcherHtml).toContain('-CONH₂');
+
+    const workflowHtml = renderToStaticMarkup(
+      createElement(WorkflowCanvas, {
+        onExecuteNode: async () => ({ summary: 'ok' }),
+        activeComputeLabel: null,
+        onOpenComputeNodes: () => {},
+        bridge: mockBridge,
+      }),
+    );
+    expect(workflowHtml).toContain('Auto-Layout');
+    expect(workflowHtml).toContain('Visual Workflow Canvas');
+
+    const computeHtml = renderToStaticMarkup(
+      createElement(ComputeNodesView, {
+        activeSmiles: 'CC(=O)Nc1nnc(S(N)(=O)=O)s1',
+        activeSmilesName: 'Acetazolamide',
+        activeRefPdbOrCif: refCif,
+        activeRefLabel: '3HS4.cif',
+        pocketBox: mockBridge.dockingBox,
+        onImportArtifactToViewer: () => {},
+        bridge: mockBridge,
+      }),
+    );
+    expect(computeHtml).toContain('@container');
+    expect(computeHtml).toContain('Ligand AZM A:261');
+
+    const pluginsHtml = renderToStaticMarkup(
+      createElement(PluginsView, {
+        onOpenComputeNodes: () => {},
+        onOpenMcpServer: () => {},
+        onOpenToolTab: () => {},
+      }),
+    );
+    expect(pluginsHtml).toContain('@container');
+    expect(pluginsHtml).toContain('Open Ligands');
+
+    const resultsHtml = renderToStaticMarkup(
+      createElement(ResultsView, {
+        comparison: null,
+        paeJson: null,
+        busy: false,
+        guided: true,
+        selectedPaePair: null,
+        onSelectPaePair: () => {},
+        includePng: true,
+        onToggleIncludePng: () => {},
+        onExportHtml: () => {},
+        onExportJson: () => {},
+        onExportBundle: () => {},
+        bridge: mockBridge,
+      }),
+    );
+    expect(resultsHtml).toContain('No comparison yet');
   });
 });

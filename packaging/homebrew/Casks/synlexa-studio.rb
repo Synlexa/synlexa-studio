@@ -1,5 +1,5 @@
 cask "synlexa-studio" do
-  version "0.4.0"
+  version "0.4.1"
   sha256 :no_check
 
   url "https://github.com/Synlexa/synlexa-studio/releases/download/v#{version}/Synlexa-Studio-v#{version}-universal-apple-darwin.dmg"

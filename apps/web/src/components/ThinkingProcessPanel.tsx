@@ -7,7 +7,6 @@ import {
   Clock,
   Loader2,
   ShieldAlert,
-  Sparkles,
   Wrench,
   XCircle,
 } from 'lucide-react';
@@ -264,7 +263,7 @@ export function ThinkingProcessPanel({
         <div className={cx('border-t border-white/[0.06]', compact ? 'px-2.5 py-2' : 'px-3.5 py-2.5')}>
           {steps.length === 0 && running ? (
             <div className="flex items-center gap-2 py-1 text-xs text-slate-400">
-              <Sparkles className="h-3.5 w-3.5 animate-pulse text-sky-300" />
+              <Brain className="h-3.5 w-3.5 animate-pulse text-sky-300" />
               <span>Planning next MCP steps…</span>
             </div>
           ) : (
@@ -300,7 +299,7 @@ export function ThinkingProcessPanel({
                       {isRunningStep ? (
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
                       ) : isThinking ? (
-                        <Sparkles className="h-2.5 w-2.5" />
+                        <Brain className="h-2.5 w-2.5" />
                       ) : isPermission ? (
                         <ShieldAlert className="h-2.5 w-2.5" />
                       ) : isFailed ? (

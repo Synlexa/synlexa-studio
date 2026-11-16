@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
-import { Columns2, X } from 'lucide-react';
+import { Columns2, Maximize2, X } from 'lucide-react';
 import {
   PINNED_TABS,
   type LayoutAction,
@@ -169,7 +169,7 @@ export function EditorArea({ layout, dispatch, meta, renderTab, keepAlive }: Edi
                 );
               })}
             </div>
-            <div className="flex shrink-0 items-center px-1.5">
+            <div className="flex shrink-0 items-center gap-0.5 px-1.5">
               {group.active && (
                 <button
                   type="button"
@@ -182,6 +182,17 @@ export function EditorArea({ layout, dispatch, meta, renderTab, keepAlive }: Edi
                   className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-white/[0.07] hover:text-slate-200 disabled:opacity-30"
                 >
                   <Columns2 className="h-4 w-4" />
+                </button>
+              )}
+              {split && (
+                <button
+                  type="button"
+                  title="Merge split panes into single full-width view"
+                  aria-label="Merge split panes"
+                  onClick={() => dispatch({ type: 'merge_split' })}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-white/[0.07] hover:text-sky-300"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>
@@ -257,6 +268,15 @@ export function EditorArea({ layout, dispatch, meta, renderTab, keepAlive }: Edi
               run: () => dispatch({ type: 'open', tab: menu.tab, toSide: true }),
               disabled: !split && layout.groups[0].tabs.length < 2,
             },
+            ...(split
+              ? [
+                  {
+                    label: 'Merge split panes',
+                    run: () => dispatch({ type: 'merge_split' }),
+                    disabled: false,
+                  },
+                ]
+              : []),
             {
               label: 'Close',
               run: () => dispatch({ type: 'close', tab: menu.tab }),

@@ -56,5 +56,25 @@ describe('RDKit MinimalLib WASM & 2D Sketcher (RUO)', () => {
     const reparsed = parseMolblockToSketch(analysis.molblock2d);
     expect(reparsed.atoms).toHaveLength(6);
     expect(reparsed.bonds).toHaveLength(6);
+
+    const carboxyl = stampTemplateIntoSketch(createEmptySketch(), 'carboxyl', 200, 150);
+    expect(carboxyl.atoms).toHaveLength(3);
+    expect(carboxyl.bonds).toHaveLength(2);
+
+    const amide = stampTemplateIntoSketch(createEmptySketch(), 'amide', 200, 150);
+    expect(amide.atoms).toHaveLength(3);
+    expect(amide.bonds).toHaveLength(2);
+  });
+
+  it('highlights all SMARTS substructure matches across a molecule', async () => {
+    const rdkit = await initRDKitModule();
+    const client = RdkitClient.fromModule(rdkit);
+
+    const plain = await client.analyzeMolecule('CC(=O)Oc1ccccc1C(=O)O');
+    const highlighted = await client.analyzeMolecule('CC(=O)Oc1ccccc1C(=O)O', {
+      highlightSmarts: 'C(=O)',
+    });
+    expect(highlighted.svg).toContain('<svg');
+    expect(highlighted.svg).not.toBe(plain.svg);
   });
 });

@@ -26,7 +26,9 @@ export type RingTemplateKind =
   | 'cyclopentane'
   | 'pyridine'
   | 'thiophene'
-  | 'sulfonamide';
+  | 'sulfonamide'
+  | 'carboxyl'
+  | 'amide';
 
 const ALLOWED_ELEMENTS = new Set<SketchElement>(['C', 'N', 'O', 'S', 'P', 'F', 'Cl', 'Br']);
 
@@ -172,6 +174,32 @@ export function stampTemplateIntoSketch(
       { from: sId, to: o1, order: 2 },
       { from: sId, to: o2, order: 2 },
       { from: sId, to: nId, order: 1 },
+    );
+  } else if (kind === 'carboxyl') {
+    const cId = nextId++;
+    const o1 = nextId++;
+    const o2 = nextId++;
+    newAtoms.push(
+      { id: cId, element: 'C', x: cx, y: cy },
+      { id: o1, element: 'O', x: cx, y: cy - 44 },
+      { id: o2, element: 'O', x: cx + 40, y: cy + 22 },
+    );
+    newBonds.push(
+      { from: cId, to: o1, order: 2 },
+      { from: cId, to: o2, order: 1 },
+    );
+  } else if (kind === 'amide') {
+    const cId = nextId++;
+    const o1 = nextId++;
+    const n1 = nextId++;
+    newAtoms.push(
+      { id: cId, element: 'C', x: cx, y: cy },
+      { id: o1, element: 'O', x: cx, y: cy - 44 },
+      { id: n1, element: 'N', x: cx + 40, y: cy + 22 },
+    );
+    newBonds.push(
+      { from: cId, to: o1, order: 2 },
+      { from: cId, to: n1, order: 1 },
     );
   } else {
     const nSides = kind === 'cyclopentane' || kind === 'thiophene' ? 5 : 6;

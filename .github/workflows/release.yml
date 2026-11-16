@@ -9,7 +9,7 @@ on:
       version:
         description: "Release version tag (e.g. 0.4.0)"
         required: false
-        default: "0.4.0"
+        default: "0.4.1"
 
 permissions:
   contents: write
@@ -117,7 +117,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [[ "$GITHUB_REF_NAME" == "main" || -z "$VERSION" ]]; then
-            VERSION="${{ github.event.inputs.version || '0.4.0' }}"
+            VERSION="${{ github.event.inputs.version || '0.4.1' }}"
           fi
           echo "REL_VERSION=$VERSION" >> "$GITHUB_ENV"
 
@@ -222,7 +222,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [[ "$GITHUB_REF_NAME" == "main" || -z "$VERSION" ]]; then
-            VERSION="${{ github.event.inputs.version || '0.4.0' }}"
+            VERSION="${{ github.event.inputs.version || '0.4.1' }}"
           fi
           cargo build --release --locked --target ${{ matrix.target }} -p studio-cli
           cargo build --release --locked --target ${{ matrix.target }} --manifest-path apps/desktop/native/Cargo.toml
@@ -323,7 +323,7 @@ jobs:
         shell: pwsh
         run: |
           $ver = "${{ github.ref_name }}".TrimStart("v")
-          if (-not $ver -or $ver -eq "main") { $ver = "${{ github.event.inputs.version || '0.4.0' }}" }
+          if (-not $ver -or $ver -eq "main") { $ver = "${{ github.event.inputs.version || '0.4.1' }}" }
           cargo build --release --locked --target ${{ matrix.target }} -p studio-cli
           cargo build --release --locked --target ${{ matrix.target }} --manifest-path apps/desktop/native/Cargo.toml
 
@@ -360,7 +360,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [[ "$GITHUB_REF_NAME" == "main" || -z "$VERSION" ]]; then
-            VERSION="${{ github.event.inputs.version || '0.4.0' }}"
+            VERSION="${{ github.event.inputs.version || '0.4.1' }}"
           fi
           mkdir -p release-files
           find release-staging -type f \( -name "*.dmg" -o -name "*.tar.gz" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.zip" -o -name "*.tgz" \) -exec cp {} release-files/ \;

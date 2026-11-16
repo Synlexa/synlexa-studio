@@ -215,7 +215,7 @@ export function LibraryView({ compact = false, onOpenItem, loadedShas }: Library
 
   return (
     <div
-      className={cx('relative flex h-full min-h-0 flex-col', !compact && 'bg-[#0f131b]')}
+      className={cx('@container relative flex h-full min-h-0 flex-col', !compact && 'bg-[#0f131b]')}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes('Files')) {
           e.preventDefault();
@@ -423,11 +423,11 @@ export function LibraryView({ compact = false, onOpenItem, loadedShas }: Library
                   />
                 </th>
                 <th className="pb-2 font-medium">Name</th>
-                <th className="w-28 pb-2 font-medium">Type</th>
-                <th className="hidden w-48 pb-2 font-medium lg:table-cell">Source</th>
-                <th className="w-24 pb-2 font-medium">Size</th>
-                <th className="w-28 pb-2 font-medium">Updated</th>
-                <th className="w-56 pb-2" />
+                <th className="hidden w-24 pb-2 font-medium @lg:table-cell">Type</th>
+                <th className="hidden w-40 pb-2 font-medium @3xl:table-cell">Source</th>
+                <th className="hidden w-20 pb-2 font-medium @xl:table-cell">Size</th>
+                <th className="hidden w-24 pb-2 font-medium @2xl:table-cell">Updated</th>
+                <th className="w-40 pb-2 @xl:w-52" />
               </tr>
             </thead>
             <tbody>
@@ -479,16 +479,16 @@ export function LibraryView({ compact = false, onOpenItem, loadedShas }: Library
                         </div>
                       </div>
                     </td>
-                    <td className="py-2.5 text-slate-400">
+                    <td className="hidden py-2.5 text-slate-400 @lg:table-cell">
                       {km.label}
                       <span className="ml-1 font-mono text-xs text-slate-500 uppercase">{it.format}</span>
                     </td>
-                    <td className="hidden truncate py-2.5 pr-3 text-xs text-slate-400 lg:table-cell">
+                    <td className="hidden truncate py-2.5 pr-3 text-xs text-slate-400 @3xl:table-cell">
                       {it.source.database ?? (it.source.origin === 'local-file' ? 'Local file' : it.source.origin === 'manual' ? 'Edited' : '—')}
                       {it.source.accession && <span className="ml-1 font-mono text-slate-300">{it.source.accession}</span>}
                     </td>
-                    <td className="py-2.5 text-xs text-slate-400 tabular-nums">{formatBytes(it.sizeBytes)}</td>
-                    <td className="py-2.5 text-xs text-slate-400">{relTime(it.updatedAtUtc)}</td>
+                    <td className="hidden py-2.5 text-xs text-slate-400 tabular-nums @xl:table-cell">{formatBytes(it.sizeBytes)}</td>
+                    <td className="hidden py-2.5 text-xs text-slate-400 @2xl:table-cell">{relTime(it.updatedAtUtc)}</td>
                     <td className="py-2.5 pr-1">
                       <div className="flex items-center justify-end gap-1">
                         {it.kind === 'structure' ? (

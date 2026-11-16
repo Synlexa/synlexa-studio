@@ -4,11 +4,11 @@ version = 4
 
 [[package]]
 name = "synlexa-bio-core"
-version = "0.4.0"
+version = "0.4.1"
 
 [[package]]
 name = "synlexa-studio-desktop-native"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "synlexa-bio-core",
 ]

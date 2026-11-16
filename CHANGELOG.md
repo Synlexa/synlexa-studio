@@ -4,6 +4,16 @@ All notable changes to Synlexa Studio are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-11-16
+
+### Added
+- **Shared 3D Workspace Bridge (`Studio3DBridge` & `Project3DContextBanner`)**: Synchronized 3D focus, residue/pocket highlighting, docking box state, and active project assets across Chemistry, Peptide, CRISPR, Ramachandran, Sequence Deviation, Results, Workflow Canvas, Compute Nodes, Plugins, and Library workbenches (`WorkbenchShared.tsx`, `studioBridge.ts`).
+- **2D Sketcher & RDKit SMARTS Enhancements**: Added `carboxyl` and `amide` sketcher templates (`sketcherGraph.ts`) and full multi-match SMARTS atom/bond highlighting (`rdkitCore.ts`, `rdkitAndSketcher.test.ts`).
+- **Split Pane & Side-by-Side Controls**: Added `merge_split` layout action and pane merge button (`workspaceLayout.ts`, `EditorArea.tsx`), plus direct side-by-side split buttons in `ToolsPanel` (`Shell.tsx`).
+
+### Changed
+- **Workbench UI Polish**: Replaced decorative star icons with domain icons (`FlaskConical`, `Brain`) across `WorkbenchShared`, `SequenceDeviationTrack`, `RamachandranPanel`, `ThinkingProcessPanel`, and `ChemistryWorkbench`.
+
 ## [0.4.0] - 2026-11-16
 
 ### Added

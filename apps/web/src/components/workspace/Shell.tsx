@@ -8,6 +8,7 @@ import {
   Bot,
   Box,
   ChevronDown,
+  Columns2,
   Cpu,
   Database,
   Dna,
@@ -711,7 +712,7 @@ export function ToolsPanel({
 }) {
   return (
     <div className="h-full overflow-y-auto px-2 pb-4">
-      <p className="px-2 pb-2 text-xs text-slate-500">Click to open a tab. Alt-click splits side-by-side.</p>
+      <p className="px-2 pb-2 text-xs text-slate-500">Click to open a tab, or use the split icon to open beside 3D.</p>
       <div className="space-y-3">
         {TOOL_GROUPS.map((groupName) => (
           <div key={groupName}>
@@ -720,11 +721,11 @@ export function ToolsPanel({
             </div>
             <ul className="space-y-0.5">
               {TOOL_ENTRIES.filter((t) => t.group === groupName).map((t) => (
-                <li key={t.id}>
+                <li key={t.id} className="group flex items-center gap-1 rounded-lg pr-1 hover:bg-white/[0.04]">
                   <button
                     type="button"
                     onClick={(e) => onOpen(t.id, e.altKey)}
-                    className="group flex w-full items-start gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-white/[0.04]"
+                    className="flex min-w-0 flex-1 items-start gap-3 px-2.5 py-2 text-left"
                   >
                     <span className="mt-0.5 text-slate-500 group-hover:text-sky-300">{t.icon}</span>
                     <span className="min-w-0 flex-1">
@@ -734,6 +735,15 @@ export function ToolsPanel({
                       </span>
                       <span className="block truncate text-xs text-slate-500">{t.desc}</span>
                     </span>
+                  </button>
+                  <button
+                    type="button"
+                    title={`Open ${t.label} side-by-side`}
+                    aria-label={`Open ${t.label} side-by-side`}
+                    onClick={() => onOpen(t.id, true)}
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-500 opacity-0 transition group-hover:opacity-100 hover:bg-white/[0.08] hover:text-sky-300"
+                  >
+                    <Columns2 className="h-3.5 w-3.5" />
                   </button>
                 </li>
               ))}

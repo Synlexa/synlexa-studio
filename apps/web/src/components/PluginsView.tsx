@@ -22,6 +22,7 @@ import { Badge, Button, Card, Input, Textarea, Toggle } from './ui';
 interface PluginsViewProps {
   onOpenComputeNodes: () => void;
   onOpenMcpServer: () => void;
+  onOpenToolTab?: (tab: 'viewer' | 'chemistry' | 'ramachandran' | 'workflow' | 'compute') => void;
 }
 
 const TIER_LABELS: Record<PluginTier | 'all', string> = {
@@ -64,7 +65,7 @@ const SAMPLE_CUSTOM_MANIFEST = JSON.stringify(
   2,
 );
 
-export function PluginsView({ onOpenComputeNodes, onOpenMcpServer }: PluginsViewProps) {
+export function PluginsView({ onOpenComputeNodes, onOpenMcpServer, onOpenToolTab }: PluginsViewProps) {
   const [plugins, setPlugins] = useState(() => listAllPlugins());
   const [query, setQuery] = useState('');
   const [tierFilter, setTierFilter] = useState<PluginTier | 'all'>('all');
@@ -97,7 +98,7 @@ export function PluginsView({ onOpenComputeNodes, onOpenMcpServer }: PluginsView
   };
 
   return (
-    <div className="h-full overflow-y-auto p-4 text-xs">
+    <div className="@container h-full min-h-0 overflow-y-auto p-3 text-xs @xl:p-4">
       <div className="mx-auto max-w-6xl space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -161,7 +162,7 @@ export function PluginsView({ onOpenComputeNodes, onOpenMcpServer }: PluginsView
 
         {/* Filter Bar */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 sm:max-w-xs">
+          <div className="relative min-w-44 flex-1 @lg:max-w-xs">
             <Search className="pointer-events-none absolute top-2.5 left-2.5 h-3.5 w-3.5 text-slate-500" />
             <Input
               value={query}
@@ -189,7 +190,7 @@ export function PluginsView({ onOpenComputeNodes, onOpenMcpServer }: PluginsView
         </div>
 
         {/* Plugin Grid */}
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2 @5xl:grid-cols-3">
           {filtered.map((p) => (
             <Card key={p.id} className="flex flex-col justify-between gap-3 p-3.5">
               <div className="space-y-2">
@@ -242,6 +243,31 @@ export function PluginsView({ onOpenComputeNodes, onOpenMcpServer }: PluginsView
               <div className="flex items-center justify-between border-t border-white/[0.06] pt-2 text-[0.6875rem] text-slate-500">
                 <span className="truncate font-mono">{p.id}</span>
                 <div className="flex items-center gap-2">
+                  {onOpenToolTab && p.id === 'org.synlexa.molstar' && (
+                    <button type="button" onClick={() => onOpenToolTab('viewer')} className="text-emerald-300 hover:text-emerald-200">
+                      Open 3D
+                    </button>
+                  )}
+                  {onOpenToolTab && p.id === 'org.synlexa.rdkit-wasm' && (
+                    <button type="button" onClick={() => onOpenToolTab('chemistry')} className="text-emerald-300 hover:text-emerald-200">
+                      Open Ligands
+                    </button>
+                  )}
+                  {onOpenToolTab && p.id === 'org.synlexa.gemmi-core' && (
+                    <button type="button" onClick={() => onOpenToolTab('ramachandran')} className="text-emerald-300 hover:text-emerald-200">
+                      Open Tools
+                    </button>
+                  )}
+                  {onOpenToolTab && p.id === 'org.synlexa.workflows' && (
+                    <button type="button" onClick={() => onOpenToolTab('workflow')} className="text-emerald-300 hover:text-emerald-200">
+                      Open Canvas
+                    </button>
+                  )}
+                  {onOpenToolTab && p.tier === 'tier2-compute' && p.id !== 'org.synlexa.workflows' && (
+                    <button type="button" onClick={() => onOpenToolTab('compute')} className="text-emerald-300 hover:text-emerald-200">
+                      GPU Runner
+                    </button>
+                  )}
                   {p.homepage && (
                     <a
                       href={p.homepage}

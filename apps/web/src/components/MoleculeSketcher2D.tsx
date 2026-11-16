@@ -1,5 +1,14 @@
-import { useMemo, useRef, useState, type PointerEvent } from 'react';
-import { Atom, Eraser, Hexagon, RotateCcw, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import {
+  Atom,
+  Check,
+  Eraser,
+  Hexagon,
+  Redo2,
+  RotateCcw,
+  Trash2,
+  Undo2,
+} from 'lucide-react';
 import {
   createEmptySketch,
   parseMolblockToSketch,
@@ -14,6 +23,8 @@ import {
 
 interface MoleculeSketcher2DProps {
   initialMolblock?: string | null;
+  activeSmiles?: string;
+  activeName?: string;
   onCommitMolblock: (molblock: string) => void;
 }
 
@@ -30,28 +41,57 @@ const ELEMENT_COLORS: Record<SketchElement, string> = {
   Br: '#fb7185',
 };
 
-const TEMPLATES: Array<{ id: RingTemplateKind; label: string }> = [
-  { id: 'benzene', label: 'Benzene' },
-  { id: 'pyridine', label: 'Pyridine' },
-  { id: 'thiophene', label: 'Thiophene' },
-  { id: 'cyclohexane', label: 'Cyclohexane' },
-  { id: 'cyclopentane', label: 'Cyclopentane' },
-  { id: 'sulfonamide', label: '-SO₂NH₂' },
+const TEMPLATES: Array<{ id: RingTemplateKind; label: string; tip: string }> = [
+  { id: 'benzene', label: 'Benzene', tip: 'Stamp a 6-membered aromatic benzene ring' },
+  { id: 'pyridine', label: 'Pyridine', tip: 'Stamp an N-heteroaromatic pyridine ring' },
+  { id: 'thiophene', label: 'Thiophene', tip: 'Stamp a 5-membered S-aromatic ring' },
+  { id: 'cyclohexane', label: 'Cyclohexane', tip: 'Stamp a saturated 6-membered ring' },
+  { id: 'cyclopentane', label: 'Cyclopentane', tip: 'Stamp a saturated 5-membered ring' },
+  { id: 'sulfonamide', label: '-SO₂NH₂', tip: 'Stamp a zinc-binding sulfonamide group' },
+  { id: 'carboxyl', label: '-COOH', tip: 'Stamp a carboxylic acid group' },
+  { id: 'amide', label: '-CONH₂', tip: 'Stamp a primary amide group' },
 ];
 
 export function MoleculeSketcher2D({
   initialMolblock,
+  activeSmiles,
+  activeName,
   onCommitMolblock,
 }: MoleculeSketcher2DProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const [graph, setGraph] = useState<SketchGraph>(() =>
-    initialMolblock ? parseMolblockToSketch(initialMolblock) : stampTemplateIntoSketch(createEmptySketch(), 'benzene', 240, 150),
+  const initialGraph = useMemo(
+    () =>
+      initialMolblock
+        ? parseMolblockToSketch(initialMolblock)
+        : stampTemplateIntoSketch(createEmptySketch(), 'benzene', 240, 150),
+    // Only seed once on mount; external updates offer a clear Sync banner/auto-sync
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   );
+
+  const [history, setHistory] = useState<SketchGraph[]>([initialGraph]);
+  const [historyIdx, setHistoryIdx] = useState(0);
+  const [syncedMolblock, setSyncedMolblock] = useState<string | null>(initialMolblock ?? null);
+  const [hasLocalEdits, setHasLocalEdits] = useState(false);
+
+  const graph = history[historyIdx] ?? initialGraph;
+
   const [activeElement, setActiveElement] = useState<SketchElement>('C');
   const [activeOrder, setActiveOrder] = useState<SketchBondOrder>(1);
   const [tool, setTool] = useState<'draw' | 'erase' | RingTemplateKind>('draw');
   const [dragFromAtom, setDragFromAtom] = useState<SketchAtom | null>(null);
   const [cursorPt, setCursorPt] = useState<{ x: number; y: number } | null>(null);
+
+  // When an external preset or SMILES is selected and the user hasn't drawn local strokes since syncing, keep sketcher fresh.
+  useEffect(() => {
+    if (!initialMolblock || initialMolblock === syncedMolblock) return;
+    if (!hasLocalEdits) {
+      const parsed = parseMolblockToSketch(initialMolblock);
+      setHistory([parsed]);
+      setHistoryIdx(0);
+      setSyncedMolblock(initialMolblock);
+    }
+  }, [initialMolblock, syncedMolblock, hasLocalEdits]);
 
   const atomById = useMemo(() => {
     const m = new Map<number, SketchAtom>();
@@ -59,11 +99,43 @@ export function MoleculeSketcher2D({
     return m;
   }, [graph.atoms]);
 
-  const commit = (next: SketchGraph) => {
-    setGraph(next);
-    if (next.atoms.length > 0) {
+  const pushGraph = (next: SketchGraph, commitToEngine = true) => {
+    const sliced = history.slice(0, historyIdx + 1);
+    const updated = [...sliced, next].slice(-30);
+    setHistory(updated);
+    setHistoryIdx(updated.length - 1);
+    setHasLocalEdits(true);
+    if (commitToEngine && next.atoms.length > 0) {
       onCommitMolblock(serializeSketchToMolblock(next));
     }
+  };
+
+  const canUndo = historyIdx > 0;
+  const canRedo = historyIdx < history.length - 1;
+
+  const handleUndo = () => {
+    if (!canUndo) return;
+    const nextIdx = historyIdx - 1;
+    setHistoryIdx(nextIdx);
+    const g = history[nextIdx];
+    if (g && g.atoms.length > 0) onCommitMolblock(serializeSketchToMolblock(g));
+  };
+
+  const handleRedo = () => {
+    if (!canRedo) return;
+    const nextIdx = historyIdx + 1;
+    setHistoryIdx(nextIdx);
+    const g = history[nextIdx];
+    if (g && g.atoms.length > 0) onCommitMolblock(serializeSketchToMolblock(g));
+  };
+
+  const syncFromActive = () => {
+    if (!initialMolblock) return;
+    const parsed = parseMolblockToSketch(initialMolblock);
+    setHistory([parsed]);
+    setHistoryIdx(0);
+    setSyncedMolblock(initialMolblock);
+    setHasLocalEdits(false);
   };
 
   const clientToSvg = (e: PointerEvent<SVGSVGElement>): { x: number; y: number } => {
@@ -75,7 +147,7 @@ export function MoleculeSketcher2D({
     };
   };
 
-  const findNearestAtom = (x: number, y: number, maxDist = 16): SketchAtom | null => {
+  const findNearestAtom = (x: number, y: number, maxDist = 18): SketchAtom | null => {
     let best: SketchAtom | null = null;
     let bestD = maxDist;
     for (const a of graph.atoms) {
@@ -88,7 +160,7 @@ export function MoleculeSketcher2D({
     return best;
   };
 
-  const findNearestBond = (x: number, y: number, maxDist = 10): number => {
+  const findNearestBond = (x: number, y: number, maxDist = 11): number => {
     for (let i = 0; i < graph.bonds.length; i++) {
       const b = graph.bonds[i];
       const a1 = atomById.get(b.from);
@@ -110,8 +182,11 @@ export function MoleculeSketcher2D({
     const pt = clientToSvg(e);
 
     if (tool !== 'draw' && tool !== 'erase') {
-      const stamped = stampTemplateIntoSketch(graph, tool, pt.x, pt.y);
-      commit(stamped);
+      const hitAtom = findNearestAtom(pt.x, pt.y, 20);
+      const cx = hitAtom ? hitAtom.x : pt.x;
+      const cy = hitAtom ? hitAtom.y : pt.y;
+      const stamped = stampTemplateIntoSketch(graph, tool, cx, cy);
+      pushGraph(stamped);
       setTool('draw');
       return;
     }
@@ -119,7 +194,7 @@ export function MoleculeSketcher2D({
     const hitAtom = findNearestAtom(pt.x, pt.y);
     if (tool === 'erase') {
       if (hitAtom) {
-        commit({
+        pushGraph({
           ...graph,
           atoms: graph.atoms.filter((a) => a.id !== hitAtom.id),
           bonds: graph.bonds.filter((b) => b.from !== hitAtom.id && b.to !== hitAtom.id),
@@ -128,7 +203,7 @@ export function MoleculeSketcher2D({
       }
       const hitBondIdx = findNearestBond(pt.x, pt.y);
       if (hitBondIdx >= 0) {
-        commit({
+        pushGraph({
           ...graph,
           bonds: graph.bonds.filter((_, idx) => idx !== hitBondIdx),
         });
@@ -147,13 +222,13 @@ export function MoleculeSketcher2D({
       const nextBonds = graph.bonds.map((b, idx) =>
         idx === hitBondIdx ? { ...b, order: ((b.order % 3) + 1) as SketchBondOrder } : b,
       );
-      commit({ ...graph, bonds: nextBonds });
+      pushGraph({ ...graph, bonds: nextBonds });
       return;
     }
 
     // Place standalone atom on empty space
     const newId = graph.nextId;
-    commit({
+    pushGraph({
       atoms: [...graph.atoms, { id: newId, element: activeElement, x: pt.x, y: pt.y }],
       bonds: graph.bonds,
       nextId: newId + 1,
@@ -172,9 +247,8 @@ export function MoleculeSketcher2D({
     const hitEnd = findNearestAtom(pt.x, pt.y);
 
     if (dist < 10) {
-      // Single click on existing atom: set its element
       if (dragFromAtom.element !== activeElement) {
-        commit({
+        pushGraph({
           ...graph,
           atoms: graph.atoms.map((a) =>
             a.id === dragFromAtom.id ? { ...a, element: activeElement } : a,
@@ -182,33 +256,31 @@ export function MoleculeSketcher2D({
         });
       }
     } else if (hitEnd && hitEnd.id !== dragFromAtom.id) {
-      // Connect or cycle existing bond
       const existingIdx = graph.bonds.findIndex(
         (b) =>
           (b.from === dragFromAtom.id && b.to === hitEnd.id) ||
           (b.to === dragFromAtom.id && b.from === hitEnd.id),
       );
       if (existingIdx >= 0) {
-        commit({
+        pushGraph({
           ...graph,
           bonds: graph.bonds.map((b, idx) =>
             idx === existingIdx ? { ...b, order: ((b.order % 3) + 1) as SketchBondOrder } : b,
           ),
         });
       } else {
-        commit({
+        pushGraph({
           ...graph,
           bonds: [...graph.bonds, { from: dragFromAtom.id, to: hitEnd.id, order: activeOrder }],
         });
       }
     } else {
-      // Sprout a new atom snapped to a clean 48px bond length
       const angle = Math.atan2(pt.y - dragFromAtom.y, pt.x - dragFromAtom.x);
       const snappedAngle = Math.round(angle / (Math.PI / 6)) * (Math.PI / 6);
       const nx = Math.max(20, Math.min(460, dragFromAtom.x + Math.cos(snappedAngle) * 48));
       const ny = Math.max(20, Math.min(280, dragFromAtom.y + Math.sin(snappedAngle) * 48));
       const newId = graph.nextId;
-      commit({
+      pushGraph({
         atoms: [...graph.atoms, { id: newId, element: activeElement, x: nx, y: ny }],
         bonds: [...graph.bonds, { from: dragFromAtom.id, to: newId, order: activeOrder }],
         nextId: newId + 1,
@@ -219,42 +291,46 @@ export function MoleculeSketcher2D({
     setCursorPt(null);
   };
 
+  const outOfSync = Boolean(initialMolblock && initialMolblock !== syncedMolblock && hasLocalEdits);
+
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-[#0b1018] p-2.5">
+    <div className="flex flex-col gap-2.5 rounded-xl border border-white/[0.08] bg-[#0b1018] p-3">
+      {/* Elements, Bond Orders & History Controls */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        {/* Elements */}
         <div className="flex flex-wrap items-center gap-1">
           {ELEMENTS.map((el) => (
             <button
               key={el}
               type="button"
+              title={`Select element ${el} (click an atom to replace, or drag to sprout)`}
               onClick={() => {
                 setActiveElement(el);
                 setTool('draw');
               }}
-              className={`rounded border px-2 py-0.5 font-mono text-xs font-semibold transition ${
+              className={`rounded-md border px-2 py-1 font-mono text-xs font-semibold transition ${
                 tool === 'draw' && activeElement === el
-                  ? 'border-sky-400/60 bg-sky-500/20 text-sky-200'
-                  : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-600'
+                  ? 'border-sky-400/60 bg-sky-500/20'
+                  : 'border-white/10 bg-slate-900/80 hover:border-white/25'
               }`}
               style={{ color: ELEMENT_COLORS[el] }}
             >
               {el}
             </button>
           ))}
-          <span className="mx-1 h-4 w-px bg-slate-800" />
+          <span className="mx-1 h-4 w-px bg-white/10" />
           {([1, 2, 3] as const).map((ord) => (
             <button
               key={ord}
               type="button"
+              title={`Draw ${ord === 1 ? 'single' : ord === 2 ? 'double' : 'triple'} bond (or click existing bond to cycle)`}
               onClick={() => {
                 setActiveOrder(ord);
                 setTool('draw');
               }}
-              className={`rounded border px-2 py-0.5 font-mono text-xs transition ${
+              className={`rounded-md border px-2 py-1 font-mono text-xs transition ${
                 tool === 'draw' && activeOrder === ord
                   ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
-                  : 'border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-600'
+                  : 'border-white/10 bg-slate-900/80 text-slate-400 hover:border-white/25 hover:text-slate-200'
               }`}
             >
               {ord === 1 ? 'Single' : ord === 2 ? 'Double' : 'Triple'}
@@ -262,75 +338,104 @@ export function MoleculeSketcher2D({
           ))}
         </div>
 
-        {/* Actions */}
         <div className="flex flex-wrap items-center gap-1">
           <button
             type="button"
+            onClick={handleUndo}
+            disabled={!canUndo}
+            title="Undo last stroke"
+            className="flex items-center gap-1 rounded-md border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-300 hover:border-white/25 disabled:opacity-35"
+          >
+            <Undo2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={handleRedo}
+            disabled={!canRedo}
+            title="Redo stroke"
+            className="flex items-center gap-1 rounded-md border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-300 hover:border-white/25 disabled:opacity-35"
+          >
+            <Redo2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
             onClick={() => setTool(tool === 'erase' ? 'draw' : 'erase')}
-            className={`flex items-center gap-1 rounded border px-2 py-0.5 text-xs transition ${
+            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition ${
               tool === 'erase'
                 ? 'border-rose-400/60 bg-rose-500/20 text-rose-200'
-                : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-600'
+                : 'border-white/10 bg-slate-900/80 text-slate-300 hover:border-white/25'
             }`}
           >
-            <Eraser className="h-3 w-3" /> Erase
+            <Eraser className="h-3.5 w-3.5" /> Erase
           </button>
           {initialMolblock && (
             <button
               type="button"
-              onClick={() => setGraph(parseMolblockToSketch(initialMolblock))}
-              className="flex items-center gap-1 rounded border border-slate-800 bg-slate-900 px-2 py-0.5 text-xs text-slate-300 hover:border-slate-600"
-              title="Import active molecule into sketcher"
+              onClick={syncFromActive}
+              className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition ${
+                outOfSync
+                  ? 'border-amber-400/50 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25'
+                  : 'border-white/10 bg-slate-900/80 text-slate-300 hover:border-white/25'
+              }`}
+              title="Import the active analyzed molecule into the sketcher canvas"
             >
-              <RotateCcw className="h-3 w-3" /> Sync from Active
+              <RotateCcw className="h-3.5 w-3.5" /> Load Active
             </button>
           )}
           <button
             type="button"
-            onClick={() => setGraph(createEmptySketch())}
-            className="flex items-center gap-1 rounded border border-slate-800 bg-slate-900 px-2 py-0.5 text-xs text-slate-400 hover:border-rose-500/40 hover:text-rose-200"
+            onClick={() => {
+              pushGraph(createEmptySketch(), false);
+            }}
+            className="flex items-center gap-1 rounded-md border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-400 hover:border-rose-500/40 hover:text-rose-200"
           >
-            <Trash2 className="h-3 w-3" /> Clear
+            <Trash2 className="h-3.5 w-3.5" /> Clear
           </button>
+          {graph.atoms.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onCommitMolblock(serializeSketchToMolblock(graph))}
+              className="flex items-center gap-1 rounded-md border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-200 hover:bg-emerald-500/25"
+              title="Re-analyze this 2D sketch in RDKit WASM"
+            >
+              <Check className="h-3.5 w-3.5" /> Apply Sketch
+            </button>
+          )}
         </div>
       </div>
 
       {/* Ring / Functional Templates */}
-      <div className="flex flex-wrap items-center gap-1">
-        <span className="mr-1 flex items-center gap-1 text-[0.6875rem] text-slate-500">
-          <Hexagon className="h-3 w-3" /> Stamps:
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="flex items-center gap-1 text-[0.6875rem] font-medium text-slate-400">
+          <Hexagon className="h-3.5 w-3.5 text-violet-300" /> Stamps:
         </span>
         {TEMPLATES.map((tpl) => (
           <button
             key={tpl.id}
             type="button"
+            title={tpl.tip}
             onClick={() => setTool(tool === tpl.id ? 'draw' : tpl.id)}
-            className={`rounded border px-2 py-0.5 text-[0.75rem] transition ${
+            className={`rounded-md border px-2 py-0.5 text-[0.75rem] transition ${
               tool === tpl.id
                 ? 'border-violet-400/60 bg-violet-500/20 text-violet-200'
-                : 'border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                : 'border-white/10 bg-slate-950/70 text-slate-300 hover:border-white/25 hover:text-white'
             }`}
           >
             {tpl.label}
           </button>
         ))}
-        <span className="ml-auto flex items-center gap-1 text-[0.6875rem] text-slate-500">
-          <Atom className="h-3 w-3 text-sky-400" />
-          Drag from atom to sprout bond · click bond to cycle order
-        </span>
       </div>
 
       {/* Interactive SVG Canvas */}
-      <div className="relative overflow-hidden rounded-lg border border-slate-800/90 bg-[#070b12]">
+      <div className="relative overflow-hidden rounded-lg border border-white/[0.08] bg-[#070b12]">
         <svg
           ref={svgRef}
           viewBox="0 0 480 300"
-          className="h-64 w-full touch-none select-none cursor-crosshair"
+          className="aspect-[16/10] w-full max-h-[380px] min-h-[220px] touch-none select-none cursor-crosshair"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
         >
-          {/* Subtle grid */}
           <defs>
             <pattern id="synlexa-sketch-grid" width="24" height="24" patternUnits="userSpaceOnUse">
               <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(148,163,184,0.06)" strokeWidth="1" />
@@ -338,7 +443,6 @@ export function MoleculeSketcher2D({
           </defs>
           <rect width="480" height="300" fill="url(#synlexa-sketch-grid)" />
 
-          {/* Preview bond during drag */}
           {dragFromAtom && cursorPt && (
             <line
               x1={dragFromAtom.x}
@@ -351,7 +455,6 @@ export function MoleculeSketcher2D({
             />
           )}
 
-          {/* Bonds */}
           {graph.bonds.map((b, idx) => {
             const a1 = atomById.get(b.from);
             const a2 = atomById.get(b.to);
@@ -392,7 +495,6 @@ export function MoleculeSketcher2D({
             );
           })}
 
-          {/* Atoms */}
           {graph.atoms.map((a) => (
             <g key={a.id}>
               <circle
@@ -419,6 +521,30 @@ export function MoleculeSketcher2D({
             </g>
           ))}
         </svg>
+
+        {graph.atoms.length === 0 && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-slate-500">
+            Click anywhere to place an atom, or select a Stamp above and click on the grid.
+          </div>
+        )}
+      </div>
+
+      {/* Live Canvas Readout & Instructions */}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[0.6875rem] text-slate-400">
+        <span className="flex items-center gap-1.5">
+          <Atom className="h-3.5 w-3.5 text-sky-400" />
+          <span>
+            {tool === 'erase'
+              ? 'Erase mode: click any atom or bond to remove it'
+              : tool !== 'draw'
+                ? `Stamp mode (${tool}): click canvas to place group`
+                : 'Drag from an atom to sprout a 30°-snapped bond · Click a bond to cycle 1/2/3 · Click atom to swap element'}
+          </span>
+        </span>
+        <span className="font-mono text-slate-300">
+          {graph.atoms.length} atoms · {graph.bonds.length} bonds
+          {activeSmiles ? ` · ${activeName ? `${activeName}: ` : ''}${activeSmiles.slice(0, 36)}${activeSmiles.length > 36 ? '…' : ''}` : ''}
+        </span>
       </div>
     </div>
   );

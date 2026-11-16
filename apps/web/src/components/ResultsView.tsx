@@ -1,5 +1,18 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
-import { Check, ChevronDown, ChevronRight, Copy, Download, FileCode2, FileJson, Layers } from 'lucide-react';
+import {
+  Activity,
+  Box,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Crosshair,
+  Download,
+  FileCode2,
+  FileJson,
+  GitCompareArrows,
+  Layers,
+} from 'lucide-react';
 import type { CompareStructuresResult } from '@synlexa/wasm-bridge';
 import { paeColorBytes } from '../lib/colorPalettes';
 import {
@@ -11,8 +24,10 @@ import {
   meanPaeFromJson,
 } from '../lib/metricInsights';
 import { RUO_DISCLAIMER } from '../lib/reportGenerator';
+import type { Studio3DBridge } from '../lib/studioBridge';
 import { MetricInsightBadge } from './MetricInsightBadge';
 import { Badge, Button, Card, EmptyState, Toggle } from './ui';
+import { Project3DContextBanner, ToolGuideCard } from './WorkbenchShared';
 
 interface ResultsViewProps {
   comparison: CompareStructuresResult | null;
@@ -26,6 +41,7 @@ interface ResultsViewProps {
   onExportHtml: () => void;
   onExportJson: () => void;
   onExportBundle: () => void;
+  bridge?: Studio3DBridge;
 }
 
 export function ResultsView({
@@ -40,9 +56,11 @@ export function ResultsView({
   onExportHtml,
   onExportJson,
   onExportBundle,
+  bridge,
 }: ResultsViewProps) {
   const [copied, setCopied] = useState<string | null>(null);
   const [showMatrix, setShowMatrix] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const meanPlddt = useMemo(
     () => (comparison ? meanOf(comparison.matchedResidues.map((r) => r.mobPlddt)) : null),
@@ -50,13 +68,32 @@ export function ResultsView({
   );
   const meanPae = useMemo(() => meanPaeFromJson(paeJson), [paeJson]);
 
+  const topDeviations = useMemo(() => {
+    if (!comparison) return [];
+    return [...comparison.matchedResidues]
+      .sort((a, b) => b.distanceAngstrom - a.distanceAngstrom)
+      .slice(0, 8);
+  }, [comparison]);
+
   if (!comparison) {
     return (
-      <EmptyState
-        icon={<Layers className="h-8 w-8" />}
-        title={busy ? 'Running comparison…' : 'No comparison yet'}
-        description="Load a reference and a comparison structure (from a file, your library, or a public database) to see RMSD, coverage, confidence, and provenance here."
-      />
+      <div className="@container flex h-full min-h-0 flex-col p-3 @xl:p-4">
+        <Project3DContextBanner
+          bridge={bridge}
+          title="Comparison Results & Provenance"
+          subtitle="Quantitative RMSD, coverage, PAE matrix, top deviation hotspots, and RUO exports."
+          icon={<Layers className="h-4 w-4" />}
+          guideOpen={guideOpen}
+          onToggleGuide={() => setGuideOpen((v) => !v)}
+        />
+        <div className="flex-1">
+          <EmptyState
+            icon={<Layers className="h-8 w-8" />}
+            title={busy ? 'Running comparison…' : 'No comparison yet'}
+            description="Load a reference and a comparison structure (from a file, your library, or a public database) to see RMSD, coverage, confidence, and provenance here."
+          />
+        </div>
+      </div>
     );
   }
 
@@ -85,32 +122,70 @@ export function ResultsView({
   if (meanPae !== null) stats.push({ label: 'Mean PAE', value: `${meanPae.toFixed(1)} Å`, sub: 'predicted aligned error' });
 
   return (
-    <div className="@container h-full overflow-y-auto">
-      <div className="mx-auto max-w-4xl space-y-5 px-5 py-6">
-        <div>
-          <div className="text-xs font-medium tracking-wide text-slate-500 uppercase">Structure comparison</div>
-          <h1 className="mt-1 flex flex-wrap items-center gap-x-2 text-lg font-semibold text-slate-100">
-            <span className="text-sky-300">{comparison.reference.label}</span>
-            <span className="text-sm font-normal text-slate-500">chain {comparison.reference.chainId}</span>
-            <span className="text-slate-600">vs</span>
-            <span className="text-emerald-300">{comparison.mobile.label}</span>
-            <span className="text-sm font-normal text-slate-500">chain {comparison.mobile.chainId}</span>
-          </h1>
-        </div>
+    <div className="@container h-full min-h-0 overflow-y-auto">
+      <div className="mx-auto max-w-5xl space-y-4 p-3 @xl:px-5 @xl:py-5">
+        <Project3DContextBanner
+          bridge={bridge}
+          title={`${comparison.reference.label} (${comparison.reference.chainId}) vs ${comparison.mobile.label} (${comparison.mobile.chainId})`}
+          subtitle="Deterministic Kabsch rigid superposition metrics, PAE domain confidence, top deviation hotspots & RUO exports."
+          icon={<Layers className="h-4 w-4" />}
+          guideOpen={guideOpen}
+          onToggleGuide={() => setGuideOpen((v) => !v)}
+          actions={
+            bridge && (
+              <div className="flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    bridge.setColorMode3D('deviation');
+                    bridge.openTab('viewer', false);
+                  }}
+                  className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[0.6875rem] text-slate-200 hover:border-sky-400/40"
+                >
+                  Color 3D by Δd
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    bridge.setColorMode3D('plddt');
+                    bridge.openTab('viewer', false);
+                  }}
+                  className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[0.6875rem] text-slate-200 hover:border-emerald-400/40"
+                >
+                  Color 3D by pLDDT
+                </button>
+              </div>
+            )
+          }
+        />
+
+        <ToolGuideCard
+          open={guideOpen}
+          title="How to Read Comparison Results"
+          summary="Results summarize deterministic Cα Kabsch superposition between your reference and comparison structures, paired with AlphaFold PAE uncertainty when available."
+          steps={[
+            'Check Cα RMSD and Coverage cards to see global fold similarity and whether termini/loops were excluded.',
+            'Inspect Highest Deviation Residues below and click any residue to jump directly to it in 3D.',
+            'Click any cell on the PAE heatmap to verify inter-residue domain confidence and focus residue i in 3D.',
+          ]}
+          connectionTip="Use 'Color 3D by Δd' or click any residue in the deviation table or PAE heatmap to synchronize the 3D Viewer, Sequence Track, and Ramachandran plot."
+        />
 
         <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-3">
           {stats.map((s) => (
-            <div key={s.label} className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4">
-              <div className="text-xs text-slate-400">{s.label}</div>
-              <div className={`mt-1 text-xl font-semibold whitespace-nowrap tabular-nums @2xl:text-2xl ${s.tone ?? 'text-slate-100'}`}>{s.value}</div>
-              {s.sub && <div className="mt-0.5 text-xs text-slate-500">{s.sub}</div>}
+            <div key={s.label} className="min-w-0 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3.5">
+              <div className="truncate text-xs text-slate-400">{s.label}</div>
+              <div className={`mt-1 truncate text-xl font-semibold tabular-nums @2xl:text-2xl ${s.tone ?? 'text-slate-100'}`}>
+                {s.value}
+              </div>
+              {s.sub && <div className="mt-0.5 truncate text-xs text-slate-500">{s.sub}</div>}
             </div>
           ))}
         </div>
 
-        {guided && (
-          <Card title="What this means" description="Plain-language reading of the deterministic metrics.">
-            <div className="space-y-2">
+        {(guided || true) && (
+          <Card title="Plain-English Summary" description="Deterministic metric interpretations (RUO heuristics).">
+            <div className="grid gap-2 @2xl:grid-cols-2">
               <MetricInsightBadge insight={explainRmsd(m.rmsdAngstrom)} />
               <MetricInsightBadge
                 insight={explainCoverage(m.refCoverage.ratio, m.refCoverage.numerator, m.refCoverage.denominator)}
@@ -121,7 +196,83 @@ export function ResultsView({
           </Card>
         )}
 
-        <PaeCard paeJson={paeJson} selected={selectedPaePair} onSelect={onSelectPaePair} status={m.paeStatus} />
+        {/* Highest Structural Deviation Hotspots */}
+        {topDeviations.length > 0 && (
+          <Card
+            title="Highest Structural Deviations (Top Δd Residues)"
+            description="Residues with the largest Cα-to-Cα offset after rigid superposition — click any chip to inspect in 3D."
+            actions={
+              bridge && (
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      bridge.highlightIn3D(
+                        topDeviations.map((r) => r.refSeqId),
+                        'Top Δd Hotspots',
+                        { focusSeqId: topDeviations[0]?.refSeqId },
+                      )
+                    }
+                    className="inline-flex items-center gap-1 rounded-md border border-rose-400/40 bg-rose-500/15 px-2 py-1 text-xs font-medium text-rose-200 hover:bg-rose-500/25"
+                  >
+                    <Box className="h-3 w-3" /> Highlight Top {topDeviations.length} in 3D
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => bridge.openTab('sequence')}
+                    className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-slate-200 hover:border-sky-400/40"
+                  >
+                    <GitCompareArrows className="h-3 w-3" /> Sequence Track
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => bridge.openTab('ramachandran')}
+                    className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-slate-200 hover:border-cyan-400/40"
+                  >
+                    <Activity className="h-3 w-3" /> Ramachandran
+                  </button>
+                </div>
+              )
+            }
+          >
+            <div className="grid grid-cols-2 gap-2 @xl:grid-cols-4">
+              {topDeviations.map((r) => (
+                <button
+                  key={`${r.refSeqId}-${r.mobSeqId}`}
+                  type="button"
+                  onClick={() => {
+                    onSelectPaePair(r.mobSeqId, r.mobSeqId);
+                    bridge?.focusIn3D(r.refSeqId, { centerCamera: true });
+                  }}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.08] bg-black/25 px-2.5 py-2 text-left font-mono text-xs transition hover:border-amber-400/50"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate font-semibold text-slate-100">
+                      {r.resName3} {r.refSeqId}
+                    </div>
+                    <div className="truncate text-[0.6875rem] text-slate-500">
+                      {r.mobPlddt != null ? `pLDDT ${r.mobPlddt.toFixed(0)}` : 'Exp/Model'}
+                    </div>
+                  </div>
+                  <span className="shrink-0 font-semibold text-amber-300">
+                    {r.distanceAngstrom.toFixed(2)} Å
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        <PaeCard
+          paeJson={paeJson}
+          selected={selectedPaePair}
+          onSelect={(i, j) => {
+            onSelectPaePair(i, j);
+            bridge?.focusIn3D(i, { centerCamera: true });
+          }}
+          status={m.paeStatus}
+          onFocusIn3D={bridge ? (seq) => bridge.focusIn3D(seq, { centerCamera: true, openViewer: 'activate' }) : undefined}
+        />
 
         <Card title="Provenance" description="Exact inputs used for this result.">
           <div className="space-y-2">
@@ -203,11 +354,13 @@ function PaeCard({
   selected,
   onSelect,
   status,
+  onFocusIn3D,
 }: {
   paeJson: string | null;
   selected: [number, number] | null;
   onSelect: (i: number, j: number) => void;
   status: string;
+  onFocusIn3D?: (seqId: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const baseRef = useRef<HTMLCanvasElement | null>(null);
@@ -294,15 +447,26 @@ function PaeCard({
           : `No PAE matrix loaded (${status}). AlphaFold DB imports include it automatically.`
       }
       actions={
-        hover ? (
-          <span className="font-mono text-xs text-slate-300 tabular-nums">
-            ({hover.i}, {hover.j}) = {hover.val.toFixed(1)} Å
-          </span>
-        ) : selected ? (
-          <span className="font-mono text-xs text-amber-300">
-            selected ({selected[0]}, {selected[1]})
-          </span>
-        ) : null
+        <div className="flex items-center gap-2">
+          {hover ? (
+            <span className="font-mono text-xs text-slate-300 tabular-nums">
+              ({hover.i}, {hover.j}) = {hover.val.toFixed(1)} Å
+            </span>
+          ) : selected ? (
+            <span className="font-mono text-xs text-amber-300">
+              selected ({selected[0]}, {selected[1]})
+            </span>
+          ) : null}
+          {selected && onFocusIn3D && (
+            <button
+              type="button"
+              onClick={() => onFocusIn3D(selected[0])}
+              className="inline-flex items-center gap-1 rounded-md border border-sky-400/40 bg-sky-500/15 px-2 py-0.5 text-xs text-sky-200 hover:bg-sky-500/25"
+            >
+              <Crosshair className="h-3 w-3" /> View in 3D
+            </button>
+          )}
+        </div>
       }
     >
       {matrix ? (

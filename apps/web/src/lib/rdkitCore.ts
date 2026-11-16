@@ -130,6 +130,25 @@ function styleDarkSvg(rawSvg: string): string {
     .replace(/fill:#000000;/gi, 'fill:#e2e8f0;');
 }
 
+function collectSubstructHighlights(mol: Mol, qMol: Mol): { atoms: number[]; bonds: number[] } {
+  const atomSet = new Set<number>();
+  const bondSet = new Set<number>();
+  try {
+    const raw = mol.get_substruct_matches(qMol) || '[]';
+    const parsed = JSON.parse(raw) as Array<{ atoms?: number[]; bonds?: number[] }> | { atoms?: number[]; bonds?: number[] };
+    const list = Array.isArray(parsed) ? parsed : [parsed];
+    for (const m of list) {
+      if (Array.isArray(m.atoms)) for (const a of m.atoms) atomSet.add(a);
+      if (Array.isArray(m.bonds)) for (const b of m.bonds) bondSet.add(b);
+    }
+  } catch {
+    const fallback = JSON.parse(mol.get_substruct_match(qMol) || '{}') as { atoms?: number[]; bonds?: number[] };
+    if (Array.isArray(fallback.atoms)) for (const a of fallback.atoms) atomSet.add(a);
+    if (Array.isArray(fallback.bonds)) for (const b of fallback.bonds) bondSet.add(b);
+  }
+  return { atoms: Array.from(atomSet), bonds: Array.from(bondSet) };
+}
+
 export function analyzeMoleculeWithRdkit(
   rdkit: MainModule,
   input: string,
@@ -159,13 +178,14 @@ export function analyzeMoleculeWithRdkit(
     }
 
     let highlightAtoms: number[] = [];
+    let highlightBonds: number[] = [];
     if (options?.highlightSmarts?.trim()) {
       const q = rdkit.get_qmol(options.highlightSmarts.trim());
       if (q && q.is_valid()) {
         try {
-          const matchJson = mol.get_substruct_match(q);
-          const parsed = JSON.parse(matchJson || '{}') as { atoms?: number[] };
-          if (Array.isArray(parsed.atoms)) highlightAtoms = parsed.atoms;
+          const hits = collectSubstructHighlights(mol, q);
+          highlightAtoms = hits.atoms;
+          highlightBonds = hits.bonds;
         } finally {
           q.delete();
         }
@@ -181,6 +201,7 @@ export function analyzeMoleculeWithRdkit(
               width,
               height,
               atoms: highlightAtoms,
+              bonds: highlightBonds,
               highlightColour: [0.22, 0.74, 0.97, 0.45],
             }),
           )
@@ -309,9 +330,11 @@ export function searchWithRdkit(
       }
       try {
         let matchedAtoms: number[] = [];
+        let matchedBonds: number[] = [];
         if (qMol && qMol.is_valid()) {
-          const mj = JSON.parse(m.get_substruct_match(qMol) || '{}') as { atoms?: number[] };
-          if (Array.isArray(mj.atoms)) matchedAtoms = mj.atoms;
+          const hits = collectSubstructHighlights(m, qMol);
+          matchedAtoms = hits.atoms;
+          matchedBonds = hits.bonds;
         }
         const fp = m.get_morgan_fp_as_uint8array(JSON.stringify({ radius: 2, nBits: 2048 })) as Uint8Array;
         const tanimoto = queryFp ? tanimotoUint8(queryFp, fp) : matchedAtoms.length > 0 ? 1 : 0;
@@ -322,6 +345,7 @@ export function searchWithRdkit(
                   width: 180,
                   height: 110,
                   atoms: matchedAtoms,
+                  bonds: matchedBonds,
                   highlightColour: [0.22, 0.74, 0.97, 0.45],
                 }),
               )

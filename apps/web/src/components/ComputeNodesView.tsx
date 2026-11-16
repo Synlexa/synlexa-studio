@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Activity,
+  Box,
   CheckCircle2,
   Cloud,
   Copy,
@@ -30,7 +31,9 @@ import {
   type ComputeJobRecord,
 } from '../lib/computeBridge';
 import type { DockingBoxSpec } from '../lib/dockingBox';
+import type { Studio3DBridge } from '../lib/studioBridge';
 import { Badge, Button, Card, cx, Input } from './ui';
+import { Project3DContextBanner, ToolGuideCard } from './WorkbenchShared';
 
 interface ComputeNodesViewProps {
   activeSmiles: string;
@@ -44,9 +47,38 @@ interface ComputeNodesViewProps {
     content: string;
     format: 'pdb' | 'mmcif' | 'sdf' | 'pdbqt' | 'mol';
   }) => void;
+  bridge?: Studio3DBridge;
 }
 
 type RunnerPreset = 'vina_docking' | 'openmm_md' | 'boltz_predict' | 'pyscf_qm' | 'rfdiffusion_design';
+
+const RUNNER_INFO: Record<RunnerPreset, { label: string; desc: string; inputNote: string }> = {
+  vina_docking: {
+    label: 'AutoDock Vina',
+    desc: 'Rigid-receptor / flexible-ligand docking inside the 3D pocket box.',
+    inputNote: 'Uses your active Ligand SMILES + active 3D Receptor + 3D Pocket Box.',
+  },
+  openmm_md: {
+    label: 'OpenMM MD',
+    desc: 'GPU-accelerated energy minimization and molecular dynamics relaxation.',
+    inputNote: 'Uses the active 3D Receptor PDB/mmCIF structure.',
+  },
+  boltz_predict: {
+    label: 'Boltz-2 AI',
+    desc: 'MIT-licensed biomolecular folding and protein-ligand complex prediction.',
+    inputNote: 'Uses the protein sequence + optional co-folded Ligand SMILES.',
+  },
+  rfdiffusion_design: {
+    label: 'RFdiffusion',
+    desc: 'Generative de novo backbone design against a target 3D protein surface.',
+    inputNote: 'Uses the active 3D Receptor structure + contig specification.',
+  },
+  pyscf_qm: {
+    label: 'PySCF DFT',
+    desc: 'Quantum chemical DFT electronic structure (HOMO/LUMO gap, dipole).',
+    inputNote: 'Uses the active Ligand SMILES + chosen functional & basis set.',
+  },
+};
 
 export function ComputeNodesView({
   activeSmiles,
@@ -56,6 +88,7 @@ export function ComputeNodesView({
   pocketBox,
   stagedComputeTarget,
   onImportArtifactToViewer,
+  bridge,
 }: ComputeNodesViewProps) {
   const [snapshot, setSnapshot] = useState(() => getComputeSnapshot());
   const [pairingInput, setPairingInput] = useState('');
@@ -63,6 +96,7 @@ export function ComputeNodesView({
   const [pairError, setPairError] = useState<string | null>(null);
   const [probingId, setProbingId] = useState<string | null>(null);
   const [copiedCmd, setCopiedCmd] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const [selectedRunner, setSelectedRunner] = useState<RunnerPreset>('vina_docking');
   const [smilesParam, setSmilesParam] = useState(activeSmiles);
@@ -70,6 +104,8 @@ export function ComputeNodesView({
     'MSHHWGYGKHNGPEHWHKDFPIAKGERQSPVDIDTHTAKYDPSLKPLSVSYDQATSLRIL',
   );
   const [mdSteps, setMdSteps] = useState('1000');
+  const [exhaustiveness, setExhaustiveness] = useState('8');
+  const [contigsParam, setContigsParam] = useState('[A1-60/0 50-70]');
   const [dftFunctional, setDftFunctional] = useState('B3LYP');
   const [dftBasis, setDftBasis] = useState('sto-3g');
   const [submitting, setSubmitting] = useState(false);
@@ -121,7 +157,7 @@ export function ComputeNodesView({
 
   const handleRunJob = async () => {
     if (!activeNode) {
-      setJobError('Connect and select a compute node first.');
+      setJobError('Pair and select an online GPU/compute node first (see steps above).');
       return;
     }
     setSubmitting(true);
@@ -134,7 +170,7 @@ export function ComputeNodesView({
           receptorPdb: activeRefPdbOrCif,
           center: pocketBox?.center ?? [0, 0, 0],
           size: pocketBox?.size ?? [22, 22, 22],
-          exhaustiveness: 8,
+          exhaustiveness: Number.parseInt(exhaustiveness, 10) || 8,
           numModes: 9,
         };
       } else if (selectedRunner === 'openmm_md') {
@@ -160,7 +196,7 @@ export function ComputeNodesView({
       } else if (selectedRunner === 'rfdiffusion_design') {
         params = {
           targetPdb: activeRefPdbOrCif,
-          contigs: '[A1-60/0 50-70]',
+          contigs: contigsParam.trim() || '[A1-60/0 50-70]',
           numDesigns: 2,
         };
       }
@@ -191,24 +227,32 @@ export function ComputeNodesView({
   };
 
   const localCmd = 'cd services/compute-worker && python3 -m synlexa_compute.server --port 4180 --tunnel';
+  const runnerSpec = RUNNER_INFO[selectedRunner];
 
   return (
-    <div className="h-full overflow-y-auto p-4 text-xs">
-      <div className="mx-auto max-w-6xl space-y-4">
-        {/* Header */}
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="flex items-center gap-2 text-base font-semibold text-slate-100">
-              <Server className="h-4 w-4 text-sky-400" />
-              External GPU & Compute Nodes (Tier-2 Bridge)
-            </h2>
-            <p className="mt-1 text-slate-400">
-              Pair Google Colab (T4/L4/A100), local CUDA/Apple Metal workstations, Docker, or remote HPC servers to run
-              AutoDock Vina, OpenMM, Boltz-2, RFdiffusion + ProteinMPNN, GROMACS, and PySCF.
-            </p>
-          </div>
-          <Badge tone="warn">Tokens sealed in AES-256-GCM state.vscdb</Badge>
-        </div>
+    <div className="@container h-full min-h-0 overflow-y-auto p-3 text-xs @xl:p-4">
+      <div className="mx-auto max-w-6xl space-y-3.5">
+        <Project3DContextBanner
+          bridge={bridge}
+          title="External GPU & Compute Nodes (Tier-2 Bridge)"
+          subtitle="Pair Google Colab (T4/L4/A100), local CUDA/Apple Metal workstations, or HPC servers to run heavy docking, MD, folding & DFT."
+          icon={<Server className="h-4 w-4" />}
+          guideOpen={guideOpen}
+          onToggleGuide={() => setGuideOpen((v) => !v)}
+          actions={<Badge tone="warn">Tokens sealed in AES-256-GCM state.vscdb</Badge>}
+        />
+
+        <ToolGuideCard
+          open={guideOpen}
+          title="How to Connect a GPU / Compute Node in 3 Steps"
+          summary="Lightweight analysis runs instantly in browser Wasm. For heavy GPU/CPU engines (AutoDock Vina, OpenMM, Boltz-2, RFdiffusion, PySCF), pair an external worker running on your computer or free Google Colab."
+          steps={[
+            'Start the worker locally using the command below OR open services/compute-worker/colab/synlexa_colab_gpu.ipynb in Google Colab.',
+            'Copy the printed synlexa-node://...#<token> pairing URL and paste it into Pair & Probe.',
+            'Select a workload below (pre-filled with your active 3D protein, pocket box & SMILES) and click Dispatch to Node. Completed poses/structures load directly into the Mol* 3D Viewer!',
+          ]}
+          connectionTip="Docked poses (.pdbqt/.sdf), relaxed trajectories (.pdb), and predicted complexes (.cif) can be loaded straight into the main 3D Viewer as overlays using 'Load <artifact>' on completed jobs."
+        />
 
         {/* Pair New Compute Node */}
         <Card className="space-y-3 p-3.5">
@@ -224,14 +268,14 @@ export function ComputeNodesView({
                 setCopiedCmd(true);
                 setTimeout(() => setCopiedCmd(false), 1500);
               }}
-              className="flex items-center gap-1 rounded border border-slate-700 bg-slate-900 px-2 py-1 font-mono text-[0.6875rem] text-slate-300 hover:border-sky-500/50"
+              className="flex items-center gap-1 rounded-md border border-white/10 bg-slate-900 px-2.5 py-1 font-mono text-[0.6875rem] text-slate-300 hover:border-sky-500/50"
             >
               <Copy className="h-3 w-3" />
-              {copiedCmd ? 'Copied start command!' : 'Copy worker start command'}
+              {copiedCmd ? 'Copied start command!' : 'Copy local worker command'}
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-[12rem_1fr_auto]">
+          <div className="grid grid-cols-1 gap-2 @2xl:grid-cols-[12rem_1fr_auto]">
             <Input
               value={labelInput}
               onChange={(e) => setLabelInput(e.target.value)}
@@ -244,36 +288,36 @@ export function ComputeNodesView({
               className="font-mono"
             />
             <Button variant="primary" size="sm" icon={<Plus className="h-3.5 w-3.5" />} onClick={() => void handlePair()}>
-              Pair & Probe
+              Pair &amp; Probe
             </Button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-slate-400">
-            <Terminal className="h-3.5 w-3.5 text-slate-500" />
+            <Terminal className="h-3.5 w-3.5 shrink-0 text-slate-500" />
             <span>
               Colab notebook: <code className="text-sky-300">services/compute-worker/colab/synlexa_colab_gpu.ipynb</code>
             </span>
             <span>·</span>
-            <span>
-              Local command: <code className="text-slate-300">{localCmd}</code>
+            <span className="break-all">
+              Local: <code className="text-slate-300">{localCmd}</code>
             </span>
           </div>
 
           {pairError && (
-            <div className="rounded border border-rose-500/40 bg-rose-500/10 px-2.5 py-1.5 text-rose-200">
+            <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-2.5 py-1.5 text-rose-200">
               {pairError}
             </div>
           )}
         </Card>
 
         {/* Nodes + Active Capabilities */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          <div className="space-y-2 lg:col-span-5">
+        <div className="grid grid-cols-1 gap-4 @4xl:grid-cols-12">
+          <div className="space-y-2 @4xl:col-span-5">
             <div className="text-xs font-semibold tracking-wide text-slate-400 uppercase">
               Registered Nodes ({snapshot.nodes.length})
             </div>
             {snapshot.nodes.length === 0 ? (
-              <Card className="p-4 text-slate-400">
+              <Card className="p-4 text-slate-400 leading-relaxed">
                 No external nodes paired yet. Start <code className="text-slate-200">synlexa-compute</code> locally or in
                 Google Colab and paste its <code className="text-sky-300">synlexa-node://</code> pairing string above.
               </Card>
@@ -293,17 +337,17 @@ export function ComputeNodesView({
                     )}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
                         <span
                           className={cx(
-                            'h-2 w-2 rounded-full',
+                            'h-2 w-2 shrink-0 rounded-full',
                             node.online ? 'bg-emerald-400' : 'bg-slate-600',
                           )}
                         />
-                        <span className="font-semibold text-slate-100">{node.label}</span>
+                        <span className="truncate font-semibold text-slate-100">{node.label}</span>
                         <Badge tone={node.kind === 'colab' ? 'accent' : 'neutral'}>{node.kind}</Badge>
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex shrink-0 items-center gap-1">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -352,25 +396,17 @@ export function ComputeNodesView({
           </div>
 
           {/* Right: Installed Engines & Direct Runner */}
-          <div className="space-y-3 lg:col-span-7">
+          <div className="space-y-3 @4xl:col-span-7">
             <Card className="p-3.5">
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="font-semibold text-slate-200">Run GPU / HPC Workload</span>
                 <span className="font-mono text-[0.6875rem] text-slate-400">
-                  Target: {activeNode ? `${activeNode.label} (${activeNode.online ? 'online' : 'offline'})` : 'None'}
+                  Target: {activeNode ? `${activeNode.label} (${activeNode.online ? 'online' : 'offline'})` : 'No node selected'}
                 </span>
               </div>
 
               <div className="flex flex-wrap gap-1.5 pb-2.5">
-                {(
-                  [
-                    ['vina_docking', 'AutoDock Vina'],
-                    ['openmm_md', 'OpenMM MD'],
-                    ['boltz_predict', 'Boltz-2 AI'],
-                    ['rfdiffusion_design', 'RFdiffusion'],
-                    ['pyscf_qm', 'PySCF DFT'],
-                  ] as const
-                ).map(([id, label]) => (
+                {(Object.keys(RUNNER_INFO) as RunnerPreset[]).map((id) => (
                   <button
                     key={id}
                     type="button"
@@ -379,19 +415,41 @@ export function ComputeNodesView({
                       'rounded-lg border px-2.5 py-1 text-xs font-medium transition',
                       selectedRunner === id
                         ? 'border-sky-400/50 bg-sky-500/20 text-sky-200'
-                        : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-600',
+                        : 'border-white/10 bg-slate-900 text-slate-300 hover:border-white/25',
                     )}
                   >
-                    {label}
+                    {RUNNER_INFO[id].label}
                   </button>
                 ))}
               </div>
 
-              <div className="space-y-2 rounded-lg border border-white/[0.06] bg-[#070b12] p-2.5">
+              <div className="mb-2.5 rounded-lg border border-sky-500/20 bg-sky-500/[0.04] px-2.5 py-2 text-[0.6875rem]">
+                <div className="font-medium text-sky-200">{runnerSpec.desc}</div>
+                <div className="mt-0.5 text-slate-400">{runnerSpec.inputNote}</div>
+              </div>
+
+              <div className="space-y-2.5 rounded-lg border border-white/[0.06] bg-[#070b12] p-3">
                 {(selectedRunner === 'vina_docking' || selectedRunner === 'pyscf_qm' || selectedRunner === 'boltz_predict') && (
-                  <div>
-                    <div className="mb-1 text-[0.6875rem] text-slate-400">
-                      Ligand SMILES ({activeSmilesName})
+                  <div className="space-y-1.5">
+                    <div className="flex flex-wrap items-center justify-between gap-1 text-[0.6875rem] text-slate-400">
+                      <span>Ligand SMILES ({activeSmilesName})</span>
+                      {bridge && bridge.projectMolecules.length > 0 && (
+                        <select
+                          aria-label="Pick ligand from active project"
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value) setSmilesParam(e.target.value);
+                          }}
+                          className="rounded border border-white/10 bg-slate-900 px-1.5 py-0.5 text-[0.6875rem] text-slate-200"
+                        >
+                          <option value="">Load from Project…</option>
+                          {bridge.projectMolecules.map((m) => (
+                            <option key={m.id} value={m.smiles}>
+                              {m.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                     <Input
                       value={smilesParam}
@@ -402,19 +460,26 @@ export function ComputeNodesView({
                 )}
 
                 {selectedRunner === 'vina_docking' && (
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-[0.6875rem] text-slate-400">
-                    <span>Receptor: <strong className="text-slate-200">{activeRefLabel || 'None'}</strong></span>
-                    <span>
-                      Box: {pocketBox ? `${pocketBox.sourceLabel} · [${pocketBox.center.join(', ')}]` : 'Default [0, 0, 0]'}
-                    </span>
+                  <div className="grid grid-cols-1 gap-2 @lg:grid-cols-2">
+                    <div className="rounded-lg border border-white/[0.06] bg-slate-950/70 px-2.5 py-2 text-[0.6875rem]">
+                      <div className="text-slate-400">Receptor &amp; Pocket Box</div>
+                      <div className="mt-0.5 font-semibold text-slate-200">{activeRefLabel || 'None loaded'}</div>
+                      <div className="mt-0.5 font-mono text-slate-400">
+                        {pocketBox ? `${pocketBox.sourceLabel} · [${pocketBox.center.join(', ')}] (${pocketBox.size.join('×')} Å)` : 'Default [0, 0, 0]'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="mb-1 text-[0.6875rem] text-slate-400">Exhaustiveness (search depth)</div>
+                      <Input value={exhaustiveness} onChange={(e) => setExhaustiveness(e.target.value)} className="font-mono" />
+                    </div>
                   </div>
                 )}
 
                 {selectedRunner === 'openmm_md' && (
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 @lg:grid-cols-2">
                     <div>
                       <div className="mb-1 text-[0.6875rem] text-slate-400">Receptor Structure</div>
-                      <div className="rounded border border-slate-800 bg-slate-950 px-2 py-1.5 text-slate-300">
+                      <div className="rounded-lg border border-white/10 bg-slate-950 px-2.5 py-2 text-slate-200">
                         {activeRefLabel || 'None loaded'}
                       </div>
                     </div>
@@ -437,10 +502,25 @@ export function ComputeNodesView({
                   </div>
                 )}
 
-                {selectedRunner === 'pyscf_qm' && (
-                  <div className="grid grid-cols-2 gap-2">
+                {selectedRunner === 'rfdiffusion_design' && (
+                  <div className="grid grid-cols-1 gap-2 @lg:grid-cols-2">
                     <div>
-                      <div className="mb-1 text-[0.6875rem] text-slate-400">Functional</div>
+                      <div className="mb-1 text-[0.6875rem] text-slate-400">Target Receptor Structure</div>
+                      <div className="rounded-lg border border-white/10 bg-slate-950 px-2.5 py-2 text-slate-200">
+                        {activeRefLabel || 'None loaded'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="mb-1 text-[0.6875rem] text-slate-400">Contigs Specification</div>
+                      <Input value={contigsParam} onChange={(e) => setContigsParam(e.target.value)} className="font-mono" />
+                    </div>
+                  </div>
+                )}
+
+                {selectedRunner === 'pyscf_qm' && (
+                  <div className="grid grid-cols-1 gap-2 @lg:grid-cols-2">
+                    <div>
+                      <div className="mb-1 text-[0.6875rem] text-slate-400">DFT Functional</div>
                       <Input value={dftFunctional} onChange={(e) => setDftFunctional(e.target.value)} className="font-mono" />
                     </div>
                     <div>
@@ -451,25 +531,36 @@ export function ComputeNodesView({
                 )}
 
                 {jobError && (
-                  <div className="rounded border border-rose-500/40 bg-rose-500/10 px-2.5 py-1.5 text-rose-200">
+                  <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-2.5 py-1.5 text-rose-200">
                     {jobError}
                   </div>
                 )}
 
-                <div className="flex items-center justify-between pt-1">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                   <span className="flex items-center gap-1 text-[0.6875rem] text-slate-500">
                     <ShieldCheck className="h-3.5 w-3.5 text-amber-400/80" />
-                    RUO provenance & SHA-256 verified on return
+                    RUO provenance &amp; SHA-256 verified on return
                   </span>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    disabled={submitting || !activeNode?.online}
-                    icon={<Play className="h-3.5 w-3.5" />}
-                    onClick={() => void handleRunJob()}
-                  >
-                    {submitting ? 'Submitting…' : 'Dispatch to Node'}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {bridge && (
+                      <button
+                        type="button"
+                        onClick={() => bridge.openTab('viewer', true)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs text-slate-300 hover:border-sky-400/40"
+                      >
+                        <Box className="h-3.5 w-3.5" /> Inspect Pocket in 3D
+                      </button>
+                    )}
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={submitting || !activeNode?.online}
+                      icon={<Play className="h-3.5 w-3.5" />}
+                      onClick={() => void handleRunJob()}
+                    >
+                      {submitting ? 'Submitting…' : activeNode?.online ? 'Dispatch to Node' : 'Pair Online Node First'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </Card>
@@ -480,7 +571,7 @@ export function ComputeNodesView({
                 <div className="mb-2 text-xs font-semibold text-slate-200">
                   Detected Engines on {activeNode.label}
                 </div>
-                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-1.5 @xl:grid-cols-2">
                   {activeNode.capabilities.tools.map((t) => (
                     <div
                       key={t.id}
@@ -515,13 +606,13 @@ export function ComputeNodesView({
             Remote Compute Job Queue ({snapshot.jobs.length})
           </div>
           {snapshot.jobs.length === 0 ? (
-            <p className="text-slate-500">Dispatched GPU/HPC jobs appear here with live logs and verified artifacts.</p>
+            <p className="text-slate-500">Dispatched GPU/HPC jobs appear here with live logs and verified artifacts that load into the 3D Viewer.</p>
           ) : (
             <div className="space-y-2">
               {snapshot.jobs.map((job) => (
                 <div key={job.job_id} className="rounded-lg border border-white/[0.07] bg-[#070b12] p-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono font-semibold text-slate-100">{job.tool_id}</span>
                       <span className="font-mono text-[0.6875rem] text-slate-500">{job.job_id}</span>
                       <Badge
@@ -570,7 +661,7 @@ export function ComputeNodesView({
                           onClick={() => void handleLoadArtifact(job, art)}
                           className="flex items-center gap-1 rounded border border-sky-500/40 bg-sky-500/15 px-2 py-1 font-mono text-[0.6875rem] text-sky-200 hover:bg-sky-500/25"
                         >
-                          <Eye className="h-3 w-3" /> Load {art.name} ({art.sha256.slice(0, 8)})
+                          <Eye className="h-3 w-3" /> Load {art.name} into 3D ({art.sha256.slice(0, 8)})
                         </button>
                       ))}
                     </div>

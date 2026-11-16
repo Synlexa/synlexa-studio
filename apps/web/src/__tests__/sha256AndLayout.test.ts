@@ -55,4 +55,15 @@ describe('workspace layout reducer', () => {
     expect(s.groups[1].tabs).toEqual(['home']);
     expect(s.groups[0].tabs).not.toContain('home');
   });
+
+  it('merges split panes back into one group preserving focused active tab', () => {
+    let s = layoutReducer(DEFAULT_LAYOUT, { type: 'reset' });
+    s = layoutReducer(s, { type: 'activate', tab: 'results' });
+    expect(s.groups).toHaveLength(2);
+    expect(s.focused).toBe(1);
+    s = layoutReducer(s, { type: 'merge_split' });
+    expect(s.groups).toHaveLength(1);
+    expect(s.groups[0].active).toBe('results');
+    expect(s.groups[0].tabs).toContain('viewer');
+  });
 });

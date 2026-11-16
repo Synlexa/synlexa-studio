@@ -20,6 +20,7 @@ import { Color } from 'molstar/lib/mol-util/color';
 import 'molstar/build/viewer/molstar.css';
 import type { ColorMode } from '../lib/colorPalettes';
 import { computeDockingBox, type DockingBoxSpec } from '../lib/dockingBox';
+import type { Studio3DFocusRequest } from '../lib/studioBridge';
 import type { CameraPreset, RenderStyle, ViewportLayout } from '../lib/workbenchReducers';
 import type { MolecularViewportHandle } from './MolecularViewport';
 
@@ -40,6 +41,10 @@ interface MolStarViewportProps {
   style: RenderStyle;
   colorMode: ColorMode;
   focusedSeqId: number | null;
+  focusCameraRequest?: Studio3DFocusRequest | null;
+  highlightSourceLabel?: string | null;
+  highlightCount?: number;
+  onClearHighlights?: () => void;
   extraOverlay?: MolStarExtraOverlay | null;
   onPickResidue: (seqId: number) => void;
   onSendPocketToDocking?: (box: DockingBoxSpec) => void;
@@ -63,6 +68,10 @@ export const MolStarViewport = forwardRef<MolecularViewportHandle, MolStarViewpo
       style,
       colorMode,
       focusedSeqId,
+      focusCameraRequest,
+      highlightSourceLabel,
+      highlightCount = 0,
+      onClearHighlights,
       extraOverlay,
       onPickResidue,
       onSendPocketToDocking,
@@ -335,15 +344,16 @@ export const MolStarViewport = forwardRef<MolecularViewportHandle, MolStarViewpo
     // Focus camera on selected residue if present in comparison residues.
     useEffect(() => {
       const plugin = pluginRef.current;
-      if (!ready || !plugin || focusedSeqId === null || !comparison?.refDisplayAtoms) return;
-      const res = comparison.refDisplayAtoms.residues.find((b) => b.seqId === focusedSeqId);
+      const targetSeq = focusCameraRequest?.seqId ?? focusedSeqId;
+      if (!ready || !plugin || targetSeq === null || !comparison?.refDisplayAtoms) return;
+      const res = comparison.refDisplayAtoms.residues.find((b) => b.seqId === targetSeq);
       if (!res) return;
       void PluginCommands.Camera.Focus(plugin, {
         center: Vec3.create(res.ca[0], res.ca[1], res.ca[2]),
         radius: 14,
         durationMs: 220,
       });
-    }, [ready, focusedSeqId, comparison]);
+    }, [ready, focusedSeqId, focusCameraRequest?.nonce, focusCameraRequest?.seqId, comparison]);
 
     return (
       <div className="relative h-full w-full overflow-hidden bg-[#070b12]">
@@ -404,6 +414,32 @@ export const MolStarViewport = forwardRef<MolecularViewportHandle, MolStarViewpo
             <span className="text-sky-300">Mol* 5 (MIT)</span>
             <span>·</span>
             <span>{molCount} model{molCount === 1 ? '' : 's'}</span>
+            {focusedSeqId !== null && (
+              <>
+                <span>·</span>
+                <span className="text-amber-300">Focus #{focusedSeqId}</span>
+              </>
+            )}
+            {highlightCount > 0 && (
+              <>
+                <span>·</span>
+                <span className="inline-flex items-center gap-1 text-pink-300">
+                  <span>
+                    {highlightCount} res{highlightSourceLabel ? ` (${highlightSourceLabel})` : ''}
+                  </span>
+                  {onClearHighlights && (
+                    <button
+                      type="button"
+                      onClick={onClearHighlights}
+                      className="rounded px-1 text-pink-200 hover:bg-white/10"
+                      title="Clear highlights"
+                    >
+                      ×
+                    </button>
+                  )}
+                </span>
+              </>
+            )}
             {pocketBox && (
               <>
                 <span>·</span>

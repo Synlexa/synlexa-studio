@@ -46,6 +46,12 @@ import {
 } from './lib/bioEngineClient';
 import type { ColorMode } from './lib/colorPalettes';
 import type { CopilotAction } from './lib/copilotEngine';
+import type {
+  CoCrystalLigandInfo,
+  Studio3DBridge,
+  Studio3DFocusRequest,
+  Studio3DHighlight,
+} from './lib/studioBridge';
 import {
   importCompoundRecord,
   importStructureRecord,
@@ -308,6 +314,8 @@ export function App() {
   const [comparison, setComparison] = useState<CompareStructuresResult | null>(null);
 
   const [focusedSeqId, setFocusedSeqId] = useState<number | null>(null);
+  const [focusCameraRequest, setFocusCameraRequest] = useState<Studio3DFocusRequest | null>(null);
+  const [custom3dHighlight, setCustom3dHighlight] = useState<Studio3DHighlight | null>(null);
   const [selectedPaePair, setSelectedPaePair] = useState<[number, number] | null>(null);
 
   // Workbenches
@@ -435,10 +443,19 @@ export function App() {
   );
 
   const highlightedSeqIds = useMemo(() => {
+    if (custom3dHighlight && custom3dHighlight.seqIds.length > 0) {
+      return new Set<number>(custom3dHighlight.seqIds);
+    }
     const s = new Set<number>();
     if (peptideResult?.local3dContacts) for (const c of peptideResult.local3dContacts) s.add(c.seqId);
     return s;
-  }, [peptideResult]);
+  }, [custom3dHighlight, peptideResult]);
+
+  const highlightSourceLabel = useMemo(() => {
+    if (custom3dHighlight && custom3dHighlight.seqIds.length > 0) return custom3dHighlight.source;
+    if (peptideResult?.local3dContacts && peptideResult.local3dContacts.length > 0) return 'Peptide <5 Å shell';
+    return null;
+  }, [custom3dHighlight, peptideResult]);
 
   // ---------------------------------------------------------------- library
 
@@ -1827,6 +1844,156 @@ export function App() {
     [comparison, focusedSeqId],
   );
 
+  const coCrystalLigands = useMemo<CoCrystalLigandInfo[]>(() => {
+    const raw = comparison?.refDisplayAtoms?.ligands ?? refInspect?.ligands ?? [];
+    return raw
+      .filter((l) => l.resName.toUpperCase() !== 'HOH' && l.atoms.length > 0)
+      .map((l) => {
+        let sx = 0;
+        let sy = 0;
+        let sz = 0;
+        for (const a of l.atoms) {
+          sx += a.xyz[0];
+          sy += a.xyz[1];
+          sz += a.xyz[2];
+        }
+        const n = Math.max(1, l.atoms.length);
+        return {
+          resName: l.resName,
+          chainId: l.chainId,
+          seqId: l.seqId,
+          atomCount: l.atoms.length,
+          centroid: [sx / n, sy / n, sz / n],
+        };
+      });
+  }, [comparison, refInspect]);
+
+  const studioBridge = useMemo<Studio3DBridge>(
+    () => ({
+      activeProjectName: projectsSnap.activeProject?.name ?? null,
+      refLabel,
+      refChain,
+      mobLabel,
+      mobChain,
+      hasRef: Boolean(refContent),
+      hasMob: Boolean(mobContent),
+      hasComparison: Boolean(comparison),
+      focusedSeqId,
+      activeHighlight:
+        highlightedSeqIds.size > 0
+          ? { source: highlightSourceLabel ?? 'Selection', seqIds: Array.from(highlightedSeqIds) }
+          : null,
+      projectMolecules: projectsSnap.activeProject?.molecules ?? [],
+      projectStructures: projectsSnap.activeProject?.structures ?? [],
+      coCrystalLigands,
+      dockingBox: activePocketBox,
+      focusIn3D: (seqId, opts) => {
+        focusResidueGlobally(seqId);
+        if (opts?.style) setRenderStyle(opts.style);
+        if (opts?.centerCamera !== false) {
+          setFocusCameraRequest({ seqId, nonce: Date.now() });
+        }
+        if (opts?.openViewer === 'activate') openTab('viewer', false);
+        else if (opts?.openViewer === 'side') openTab('viewer', true);
+      },
+      highlightIn3D: (seqIds, source, opts) => {
+        const clean = Array.from(new Set(seqIds.filter((n) => Number.isFinite(n) && n > 0)));
+        setCustom3dHighlight(clean.length > 0 ? { source, seqIds: clean } : null);
+        if (opts?.focusSeqId !== undefined) {
+          focusResidueGlobally(opts.focusSeqId);
+          setFocusCameraRequest({ seqId: opts.focusSeqId, nonce: Date.now() });
+        }
+        if (opts?.style) setRenderStyle(opts.style);
+        if (opts?.openViewer === 'activate') openTab('viewer', false);
+        else if (opts?.openViewer === 'side') openTab('viewer', true);
+        if (clean.length > 0) {
+          toast(`Highlighted ${clean.length} residue(s) in 3D (${source})`, 'info');
+        }
+      },
+      clearHighlights3D: () => setCustom3dHighlight(null),
+      setStyle3D: (style) => setRenderStyle(style),
+      setColorMode3D: (mode) => setColorMode(mode),
+      openTab,
+      openDatabases: () => setDbExplorerOpen(true),
+      loadExample: () => void seedPinnedDemo(),
+      saveMoleculeToProject: (payload) => {
+        addMoleculeToActiveProject(payload);
+        toast(`Saved ${payload.name} to active project`, 'success');
+      },
+      saveMoleculeToLibrary: (payload) => {
+        void saveToLibrary({
+          kind: 'compound',
+          format: 'smiles',
+          name: payload.name,
+          content: payload.smiles,
+          source: {
+            database: null,
+            accession: null,
+            sourceUrl: null,
+            license: null,
+            retrievedAtUtc: new Date().toISOString(),
+            origin: 'manual',
+          },
+        });
+      },
+      savePeptideToProject: (payload) => {
+        addPeptideToActiveProject(payload);
+        toast(`Saved peptide "${payload.name}" to active project`, 'success');
+      },
+      saveCrisprToProject: (payload) => {
+        addCrisprToActiveProject(payload);
+        toast(`Saved CRISPR edit "${payload.name}" to active project`, 'success');
+      },
+      syncPeptideFromChain: (role) => {
+        const insp = role === 'reference' ? refInspect : mobInspect;
+        const chId = role === 'reference' ? refChain : mobChain;
+        const chain = insp?.chains.find((c) => c.chainId === chId) ?? insp?.chains[0];
+        if (!chain?.sequence1Letter) {
+          toast(`No amino-acid sequence found on ${role} chain`, 'warn');
+          return;
+        }
+        peptideDispatch({ type: 'set_sequence', sequence: chain.sequence1Letter });
+        toast(`Synced ${chain.sequence1Letter.length} aa from ${role} chain ${chain.chainId}`, 'success');
+      },
+      sendMutationToPeptide: (notation, seqId) => {
+        peptideDispatch({ type: 'add_mutation', notation });
+        if (seqId) focusResidueGlobally(seqId);
+        openTab('peptide');
+        toast(`Applied ${notation} in Peptide Workbench`, 'info');
+      },
+      sendResidueToCrispr: (codonIndex) => {
+        focusResidueGlobally(codonIndex);
+        openTab('crispr');
+      },
+      sendResidueToRamachandran: (seqId) => {
+        focusResidueGlobally(seqId);
+        openTab('ramachandran');
+      },
+    }),
+    [
+      projectsSnap.activeProject,
+      refLabel,
+      refChain,
+      mobLabel,
+      mobChain,
+      refContent,
+      mobContent,
+      comparison,
+      focusedSeqId,
+      highlightedSeqIds,
+      highlightSourceLabel,
+      coCrystalLigands,
+      activePocketBox,
+      refInspect,
+      mobInspect,
+      focusResidueGlobally,
+      openTab,
+      seedPinnedDemo,
+      saveToLibrary,
+      toast,
+    ],
+  );
+
   const executeWorkflowNode = useCallback(
     async (kind: WorkflowNodeKind, params: Record<string, unknown>) => {
       switch (kind) {
@@ -2089,7 +2256,7 @@ export function App() {
   };
 
   const guided = settings.guidedMode;
-  const wrap = (node: ReactNode) => <div className="h-full overflow-auto">{node}</div>;
+  const wrap = (node: ReactNode) => <div className="h-full min-h-0">{node}</div>;
 
   const renderTab = (id: ToolTabId): ReactNode => {
     switch (id) {
@@ -2186,6 +2353,10 @@ export function App() {
                     style={renderStyle}
                     colorMode={colorMode}
                     focusedSeqId={focusedSeqId}
+                    focusCameraRequest={focusCameraRequest}
+                    highlightSourceLabel={highlightSourceLabel}
+                    highlightCount={highlightedSeqIds.size}
+                    onClearHighlights={() => setCustom3dHighlight(null)}
                     extraOverlay={extraViewerOverlay}
                     onPickResidue={focusResidueGlobally}
                     onSendPocketToDocking={() => {
@@ -2209,7 +2380,10 @@ export function App() {
                   colorMode={colorMode}
                   onChangeColorMode={setColorMode}
                   focusedSeqId={focusedSeqId}
+                  focusCameraRequest={focusCameraRequest}
                   highlightedSeqIds={highlightedSeqIds}
+                  highlightSourceLabel={highlightSourceLabel}
+                  onClearHighlights={() => setCustom3dHighlight(null)}
                   paePair={selectedPaePair}
                   onPickResidue={focusResidueGlobally}
                   onRendererModeDetected={setRendererMode}
@@ -2264,6 +2438,7 @@ export function App() {
             onExportHtml={handleExportHtmlReport}
             onExportJson={handleExportJsonManifest}
             onExportBundle={() => void handleExportBundle()}
+            bridge={studioBridge}
           />
         );
       case 'sequence':
@@ -2276,6 +2451,7 @@ export function App() {
             mobChainId={mobChain}
             focusedSeqId={focusedSeqId}
             onFocusResidue={focusResidueGlobally}
+            bridge={studioBridge}
           />,
         );
       case 'ramachandran':
@@ -2292,6 +2468,7 @@ export function App() {
             focusedSeqId={focusedSeqId}
             onFocusResidue={focusResidueGlobally}
             simpleMode={guided}
+            bridge={studioBridge}
           />,
         );
       case 'peptide':
@@ -2303,6 +2480,7 @@ export function App() {
             error={peptideError}
             onFocusResidue={focusResidueGlobally}
             simpleMode={guided}
+            bridge={studioBridge}
           />,
         );
       case 'crispr':
@@ -2314,6 +2492,7 @@ export function App() {
             error={crisprError}
             onFocusResidue={focusResidueGlobally}
             simpleMode={guided}
+            bridge={studioBridge}
           />,
         );
       case 'chemistry':
@@ -2334,6 +2513,7 @@ export function App() {
               .filter((i) => i.kind === 'compound')
               .map((i) => ({ id: i.id, name: i.name, smiles: i.content }))}
             simpleMode={guided}
+            bridge={studioBridge}
           />,
         );
       case 'workflow':
@@ -2344,6 +2524,7 @@ export function App() {
               computeSnapshot.activeNode?.online ? computeSnapshot.activeNode.label : null
             }
             onOpenComputeNodes={() => openTab('compute')}
+            bridge={studioBridge}
           />
         );
       case 'compute':
@@ -2360,6 +2541,7 @@ export function App() {
               setViewportEngine('molstar');
               openTab('viewer');
             }}
+            bridge={studioBridge}
           />
         );
       case 'plugins':
@@ -2367,6 +2549,7 @@ export function App() {
           <PluginsView
             onOpenComputeNodes={() => openTab('compute')}
             onOpenMcpServer={() => openTab('mcp')}
+            onOpenToolTab={(tab) => openTab(tab)}
           />
         );
       case 'assistant':
