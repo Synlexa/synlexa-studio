@@ -23,8 +23,9 @@ Synlexa maintains:
 ## Private ↔ Public Sync Model (Maintainers)
 
 In the private repository, only `.github/workflows/private-*.yml` (`private-deploy-cloud.yml` and `private-sync-repos.yml`) live exclusively outside the public tree:
-- Changes landed in private `main` strip `private-*.yml` cleanly and push/sync forward to `Synlexa/synlexa-studio:main` (+ matching tags `v*`).
-- External contributor PRs merged into `Synlexa/synlexa-studio:main` are pulled back into `nanobiolog/synlexa-studio:main` via `private-sync-repos.yml` (`schedule`, `workflow_dispatch`, or `repository_dispatch`), running full `ci.yml` + `check-version-sync.mjs` so no lockfile or version conflict occurs.
+- **Private → Public (Immediate on Push)**: Commits pushed to `nanobiolog/synlexa-studio:main` and `v*` release tags strip `private-*.yml` cleanly and push directly to `Synlexa/synlexa-studio:main` (+ matching `v*` tags).
+- **Public → Private (Scheduled / Manual Sync PR)**: External contributor PRs merged into `Synlexa/synlexa-studio:main` are checked automatically every 6 hours by `private-sync-repos.yml` (`schedule`) or on demand via `workflow_dispatch` (`direction=pull-from-public`). When public changes are ahead, it runs `ci` checks and opens a `sync/public-main` → `main` Pull Request in `nanobiolog/synlexa-studio`.
+- **Important Ordering Rule**: Merge any open `sync/public-main` PR in `nanobiolog/synlexa-studio` before pushing new commits directly to private `main`, because `push-to-public` mirrors the private tree forward via `rsync --delete`. Similarly, always push release `v*` tags to `nanobiolog/synlexa-studio` so Cloud CDN deploy (`private-deploy-cloud.yml`), public repo tag sync, public GitHub Release builds, and Homebrew tap updates all fire in sync.
 
 ### Required Repository Secrets for Full Automated CD (Maintainers Only)
 

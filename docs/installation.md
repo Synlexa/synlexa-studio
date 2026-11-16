@@ -29,8 +29,7 @@ irm https://github.com/Synlexa/synlexa-studio/releases/latest/download/install.p
 ## Homebrew (macOS & Linux)
 
 ```bash
-brew tap Synlexa/tap
-brew install synlexa-studio
+brew install Synlexa/tap/synlexa-studio
 ```
 
 For the macOS `.app` bundle on Apple Silicon or Intel:
@@ -38,6 +37,8 @@ For the macOS `.app` bundle on Apple Silicon or Intel:
 ```bash
 brew install --cask Synlexa/tap/synlexa-studio
 ```
+
+*(Homebrew 6.0+/7.0+ automatically taps and trusts `Synlexa/tap/synlexa-studio` when installed by full name. If you run `brew info synlexa-studio` without `--formula` or install by short name after `brew tap`, trust the tap once via `brew trust Synlexa/tap`.)*
 
 Verify installation:
 

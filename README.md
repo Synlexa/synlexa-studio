@@ -49,13 +49,12 @@ synlexa-studio
 ### 3. Homebrew (macOS Apple Silicon / Intel & Linux)
 
 ```bash
-brew tap Synlexa/tap
-brew install synlexa-studio
+brew install Synlexa/tap/synlexa-studio
 # Optional macOS .app bundle Cask:
 brew install --cask Synlexa/tap/synlexa-studio
 ```
 
-*(Note: Homebrew 7.0+ prompts once to trust third-party taps via `brew trust Synlexa/tap`.)*
+*(Note: Using `Synlexa/tap/synlexa-studio` taps and trusts the installed formula/cask automatically on Homebrew 6.0+/7.0+ without a separate `brew trust` step. If inspecting both formula and cask via `brew info synlexa-studio`, run `brew trust Synlexa/tap` once or pass `--formula`.)*
 
 ### 4. npm (Cross-Platform Launcher & Wasm MCP Server)
 
