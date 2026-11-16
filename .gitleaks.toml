@@ -18,4 +18,5 @@ regexes = [
   '''tok_secret_abc''',
   '''tok-test-999''',
   '''secret-123''',
+  '''win32-(x64|arm64)-msvc''',
 ]

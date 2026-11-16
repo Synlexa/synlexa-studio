@@ -92,25 +92,25 @@ for (const docFile of ['README.md', 'LICENSE', 'NOTICE']) {
 
 // 3. Optional native binary packages (@synlexa/studio-<os>-<arch>)
 const PLATFORM_TARGETS = [
-  { key: 'darwin-arm64', pkgName: '@synlexa/studio-darwin-arm64', os: 'darwin', cpu: 'arm64', ext: '' },
-  { key: 'darwin-x64', pkgName: '@synlexa/studio-darwin-x64', os: 'darwin', cpu: 'x64', ext: '' },
-  { key: 'linux-x64-gnu', pkgName: '@synlexa/studio-linux-x64-gnu', os: 'linux', cpu: 'x64', ext: '' },
-  { key: 'linux-arm64-gnu', pkgName: '@synlexa/studio-linux-arm64-gnu', os: 'linux', cpu: 'arm64', ext: '' },
-  { key: 'win32-x64-msvc', pkgName: '@synlexa/studio-win32-x64-msvc', os: 'win32', cpu: 'x64', ext: '.exe' },
-  { key: 'win32-arm64-msvc', pkgName: '@synlexa/studio-win32-arm64-msvc', os: 'win32', cpu: 'arm64', ext: '.exe' },
+  { platformId: 'darwin-arm64', pkgName: '@synlexa/studio-darwin-arm64', os: 'darwin', cpu: 'arm64', ext: '' },
+  { platformId: 'darwin-x64', pkgName: '@synlexa/studio-darwin-x64', os: 'darwin', cpu: 'x64', ext: '' },
+  { platformId: 'linux-x64-gnu', pkgName: '@synlexa/studio-linux-x64-gnu', os: 'linux', cpu: 'x64', ext: '' },
+  { platformId: 'linux-arm64-gnu', pkgName: '@synlexa/studio-linux-arm64-gnu', os: 'linux', cpu: 'arm64', ext: '' },
+  { platformId: 'win32-x64-msvc', pkgName: '@synlexa/studio-win32-x64-msvc', os: 'win32', cpu: 'x64', ext: '.exe' },
+  { platformId: 'win32-arm64-msvc', pkgName: '@synlexa/studio-win32-arm64-msvc', os: 'win32', cpu: 'arm64', ext: '.exe' },
 ];
 
 const assembledPlatforms = [];
 if (platformBinsDir && existsSync(platformBinsDir)) {
   for (const target of PLATFORM_TARGETS) {
-    const srcDir = join(platformBinsDir, target.key);
+    const srcDir = join(platformBinsDir, target.platformId);
     if (!existsSync(srcDir)) continue;
     const cliBin = join(srcDir, `studio-cli${target.ext}`);
     const hostBin = join(srcDir, `synlexa-studio-desktop-native${target.ext}`);
     if (!existsSync(cliBin) || !existsSync(hostBin)) {
       throw new Error(`Missing native binaries in ${srcDir} (expected studio-cli${target.ext} and synlexa-studio-desktop-native${target.ext})`);
     }
-    const pkgDir = join(outRoot, `studio-${target.key}`);
+    const pkgDir = join(outRoot, `studio-${target.platformId}`);
     const binOut = join(pkgDir, 'bin');
     mkdirSync(binOut, { recursive: true });
     for (const [src, name] of [
@@ -131,7 +131,7 @@ if (platformBinsDir && existsSync(platformBinsDir)) {
         {
           name: target.pkgName,
           version,
-          description: `Native desktop host and CLI binaries (${target.key}) for @synlexa/studio (Research-Use-Only).`,
+          description: `Native desktop host and CLI binaries (${target.platformId}) for @synlexa/studio (Research-Use-Only).`,
           license: 'Apache-2.0',
           repository: { type: 'git', url: 'https://github.com/Synlexa/synlexa-studio.git' },
           homepage: 'https://www.synlexa.com/download',
