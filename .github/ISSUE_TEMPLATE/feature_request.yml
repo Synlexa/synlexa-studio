@@ -1,0 +1,24 @@
+name: Feature Request
+description: Propose a scientific kernel, file parser, visualization, or SDK improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Scientific or Developer Need
+      description: What workflow or algorithm would this unlock for researchers or developers?
+    validations:
+      required: true
+  - type: textarea
+    id: design
+    attributes:
+      label: Proposed Interface & Parity Notes
+      description: Should this run in synlexa-bio-core (Rust/Wasm), C++20, Web IDE, and/or synlexa-compute? Mention any reference benchmarks or upstream licenses.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Alignment
+      options:
+        - label: This keeps local functionality offline-capable without requiring a paid cloud account.
+        - label: This preserves Research-Use-Only (RUO) provenance and avoids diagnostic/clinical claims.

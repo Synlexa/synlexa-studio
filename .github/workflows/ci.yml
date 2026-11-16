@@ -1,0 +1,156 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  policy-and-security:
+    name: Version Sync, Licenses, Docs & Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install Workspace Dependencies (Frozen Lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Check Version Synchronization Across Manifests
+        run: node scripts/check-version-sync.mjs
+
+      - name: Check Licenses, Legal Files & Documentation Links
+        run: node scripts/check-docs-and-licenses.mjs
+
+      - name: Secret Scan (Gitleaks CLI)
+        run: |
+          GITLEAKS_VER="8.24.2"
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VER}/gitleaks_${GITLEAKS_VER}_linux_x64.tar.gz" -o /tmp/gitleaks.tar.gz
+          tar -C /tmp -xzf /tmp/gitleaks.tar.gz gitleaks
+          /tmp/gitleaks git --config .gitleaks.toml --verbose --redact
+
+  rust-and-desktop:
+    name: Rust Core, CLI, Wasm Crate & Desktop Host (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Test Rust Workspace (Locked)
+        run: cargo test --workspace --locked
+
+      - name: Test Native Desktop Host (Locked)
+        run: cargo test --manifest-path apps/desktop/native/Cargo.toml --locked
+
+      - name: Build studio-wasm Target
+        run: cargo build -p studio-wasm --target wasm32-unknown-unknown --release
+
+  cpp-reference:
+    name: C++20 Reference Engine (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Build Tools (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake ninja-build g++
+
+      - name: Install Build Tools (macOS)
+        if: runner.os == 'macOS'
+        run: brew install cmake ninja
+
+      - name: Configure, Build & Test C++20 Core
+        run: |
+          cmake --preset native-debug
+          cmake --build --preset native-debug
+          ctest --preset native-debug --output-on-failure
+
+  web-and-parity:
+    name: Web IDE, Wasm Parity Benchmarks & Packaging Smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Prepare Wasm Artifacts (RDKit + studio-wasm)
+        run: |
+          pnpm install --frozen-lockfile
+          node scripts/prepare-wasm.mjs --force
+
+      - name: Typecheck, Test & Build Web IDE
+        run: |
+          pnpm --filter @synlexa/studio-web lint
+          pnpm --filter @synlexa/studio-web test
+          pnpm --filter @synlexa/studio-web build
+
+      - name: Run Native-vs-Wasm Numerical Parity Benchmarks
+        run: |
+          cargo build -p studio-cli --release --locked
+          node benchmarks/run_benchmarks.mjs
+
+      - name: Test npm Package Assembly
+        run: |
+          node packaging/npm/build-npm-packages.mjs
+          VER="$(node -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).version)")"
+          test "$(node dist/npm/synlexa-studio/bin/synlexa-studio.mjs --version)" = "$VER"
+
+  python-sdk-and-compute:
+    name: Python SDK & GPU Compute Worker Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build studio-cli for SDK Tests
+        run: cargo build -p studio-cli --locked
+
+      - name: Run Python SDK & Compute Worker Tests
+        run: |
+          python -m pip install --upgrade pip pytest pydantic
+          PYTHONPATH=bindings/python python -m unittest discover -s bindings/python/tests -v
+          python -m pytest services/compute-worker/tests -q

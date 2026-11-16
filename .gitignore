@@ -1,0 +1,21 @@
+# Synlexa Studio ignores
+target/
+build/
+dist/
+node_modules/
+.DS_Store
+*.log
+*.wasm.map
+*.tsbuildinfo
+.vite/
+playwright-report/
+test-results/
+apps/desktop/src-tauri/target/
+apps/web/public/wasm/
+.wrangler/
+wrangler.jsonc
+wrangler.local.jsonc
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/

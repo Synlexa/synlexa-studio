@@ -1,0 +1,10 @@
+[package]
+name = "synlexa-studio-desktop-native"
+version = "0.4.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[workspace]
+
+[dependencies]
+synlexa-bio-core = { path = "../../../crates/synlexa-bio-core" }

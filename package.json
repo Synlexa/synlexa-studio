@@ -1,0 +1,21 @@
+{
+  "name": "synlexa-studio",
+  "version": "0.4.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Synlexa/synlexa-studio.git"
+  },
+  "packageManager": "pnpm@9.5.0",
+  "scripts": {
+    "dev": "pnpm --filter @synlexa/studio-web dev",
+    "prepare:wasm": "node scripts/prepare-wasm.mjs",
+    "build:web": "pnpm --filter @synlexa/studio-web build",
+    "test:web": "pnpm --filter @synlexa/studio-web test",
+    "lint:web": "pnpm --filter @synlexa/studio-web lint",
+    "check:versions": "node scripts/check-version-sync.mjs",
+    "check:docs": "node scripts/check-docs-and-licenses.mjs",
+    "benchmark": "node benchmarks/run_benchmarks.mjs"
+  }
+}

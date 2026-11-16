@@ -1,0 +1,14 @@
+[package]
+name = "studio-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+synlexa-bio-core = { path = "../synlexa-bio-core" }

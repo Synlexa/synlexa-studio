@@ -1,0 +1,72 @@
+Synlexa Studio
+Copyright 2026 ATIL YALI / Synlexa
+
+This product includes software developed by Synlexa (https://www.synlexa.com).
+Original Synlexa source code in this repository is licensed under the Apache
+License, Version 2.0 (see LICENSE).
+
+===========================================================================
+TRADEMARKS & BRAND ASSETS (Apache License 2.0 Section 6)
+===========================================================================
+"Synlexa", "Synlexa Studio", "Synlexa Core", and the official logo, icon,
+and wordmark files under apps/web/public/ and apps/desktop/src-tauri/icons/
+remain trademarks of Synlexa. See TRADEMARKS.md for usage terms.
+
+===========================================================================
+THIRD-PARTY SOFTWARE ATTRIBUTIONS
+===========================================================================
+
+1. Mol* (molstar)
+   License: MIT License
+   Copyright (c) Mol* contributors, https://molstar.org
+
+2. RDKit / @rdkit/rdkit (MinimalLib WebAssembly)
+   License: BSD-3-Clause License
+   Copyright (c) 2006-2026, Greg Landrum and other RDKit contributors
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted under the 3-Clause BSD License
+   (https://github.com/rdkit/rdkit/blob/master/license.txt).
+
+3. @anthropic-ai/sdk & TypeScript
+   License: Apache License, Version 2.0
+
+4. React, React DOM, Vite, Vitest, Tailwind CSS
+   License: MIT License
+
+5. Lucide React
+   License: ISC License
+
+6. lightningcss (build-time CSS bundler dependency via @tailwindcss/vite)
+   License: Mozilla Public License 2.0 (MPL-2.0)
+
+7. Tauri v2 & tauri-plugin-deep-link (apps/desktop/src-tauri scaffold)
+   License: Apache-2.0 OR MIT
+
+8. Optional external Python compute adapters (services/compute-worker)
+   Users who opt in to installing optional external scientific engines in
+   their own compute environments remain responsible for compliance with
+   those packages' upstream licenses:
+   - AutoDock Vina, PySCF, Nextflow: Apache-2.0
+   - FastAPI, Uvicorn, Pydantic, Boltz-2, Chemprop, Snakemake: MIT
+   - Biopython, RDKit: BSD-3-Clause / Biopython License
+   - Meeko: LGPL-2.1
+   - OpenMM: MIT / LGPL components
+   - GROMACS: LGPL-2.1+
+   - xTB: LGPL-3.0
+   - Open Babel (strictly user-installed external CLI plugin): GPL-2.0
+
+===========================================================================
+SCIENTIFIC TEST & DEMO FIXTURES (SEPARATE DATA LICENSES)
+===========================================================================
+The reference scientific datasets under tests/fixtures/ and
+apps/web/public/fixtures/ (listed in fixtures-manifest.json) are NOT original
+Synlexa software and remain governed by their upstream data licenses:
+
+- RCSB Protein Data Bank structures (3HS4.cif, 3HS4.pdb, 1UBQ.cif, 1A3N.cif,
+  1LZ1.cif): CC0-1.0 Universal Public Domain Dedication
+- NCBI PubChem PUG REST compound snapshot (pubchem-panel.json):
+  CC0-1.0 / NCBI Public Domain Policy
+- AlphaFold Protein Structure Database v6 models & PAE matrix
+  (AF-P00918-F1-*, AF-P0CG48-F1-*, AF-P68871-F1-*, AF-P61626-F1-*):
+  Creative Commons Attribution 4.0 International (CC-BY-4.0),
+  EMBL-EBI / Google DeepMind (Jumper et al., Varadi et al.)

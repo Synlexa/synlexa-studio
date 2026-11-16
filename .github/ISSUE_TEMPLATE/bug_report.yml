@@ -1,0 +1,43 @@
+name: Bug Report
+description: Report a numerical mismatch, parser edge case, build issue, or UI defect
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue! Remember that Synlexa Studio is **Research-Use-Only (RUO)** software. Never paste private API keys or sensitive tokens here.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Clear description of the bug and expected deterministic behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal Reproduction (CLI command, SMILES, PDB/mmCIF ID, or Web steps)
+      render: bash
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Component
+      options:
+        - Web IDE (@synlexa/studio-web)
+        - Rust Core / CLI (studio-cli / synlexa-bio-core)
+        - WebAssembly Bridge (@synlexa/wasm-bridge)
+        - C++20 Reference Core
+        - Python SDK / Compute Worker (synlexa-compute)
+        - Desktop Launcher / Installer (npm / curl / Homebrew)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Synlexa Studio Version & OS
+      placeholder: "v0.4.0 on macOS 15 arm64 / Ubuntu 24.04 / Windows 11"
+    validations:
+      required: true

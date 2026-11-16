@@ -1,0 +1,406 @@
+name: Release Synlexa Studio
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version tag (e.g. 0.4.0)"
+        required: false
+        default: "0.4.0"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-web-and-wasm:
+    name: Build Web IDE, Wasm Core & npm Packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Verify Version Sync & License Metadata
+        run: |
+          pnpm install --frozen-lockfile
+          node scripts/check-version-sync.mjs
+          node scripts/check-docs-and-licenses.mjs
+          if [[ "${GITHUB_REF_NAME:-}" == v* ]]; then
+            PKG_VER="$(node -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).version)")"
+            if [[ "${GITHUB_REF_NAME#v}" != "$PKG_VER" ]]; then
+              echo "Tag ${GITHUB_REF_NAME} does not match package.json version ${PKG_VER}" >&2
+              exit 1
+            fi
+          fi
+
+      - name: Test Rust Workspace
+        run: cargo test --workspace --locked
+
+      - name: Prepare Wasm Core & RDKit WASM
+        run: node scripts/prepare-wasm.mjs --force
+
+      - name: Lint, Test & Build Web IDE
+        run: |
+          pnpm --filter @synlexa/studio-web lint
+          pnpm --filter @synlexa/studio-web test
+          pnpm --filter @synlexa/studio-web build
+
+      - name: Assemble & Pack npm Packages (synlexa-studio & @synlexa/wasm-bridge)
+        run: |
+          node packaging/npm/build-npm-packages.mjs
+          mkdir -p dist/npm-tarballs
+          npm pack ./dist/npm/synlexa-studio --pack-destination ./dist/npm-tarballs
+          npm pack ./dist/npm/wasm-bridge --pack-destination ./dist/npm-tarballs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist-and-npm
+          path: |
+            apps/web/dist
+            apps/web/public/wasm/synlexa_bio_core.wasm
+            dist/npm-tarballs/*.tgz
+
+  build-macos-universal:
+    name: Build macOS Universal (.dmg & .tar.gz)
+    needs: build-web-and-wasm
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist-and-npm
+          path: .artifacts-in
+
+      - name: Build Universal macOS Binaries (arm64 + x86_64)
+        run: |
+          cargo build --release --locked --target aarch64-apple-darwin -p studio-cli
+          cargo build --release --locked --target x86_64-apple-darwin -p studio-cli
+          cargo build --release --locked --target aarch64-apple-darwin --manifest-path apps/desktop/native/Cargo.toml
+          cargo build --release --locked --target x86_64-apple-darwin --manifest-path apps/desktop/native/Cargo.toml
+
+          mkdir -p dist/macos-universal/bin
+          lipo -create \
+            target/aarch64-apple-darwin/release/studio-cli \
+            target/x86_64-apple-darwin/release/studio-cli \
+            -output dist/macos-universal/bin/studio-cli
+          lipo -create \
+            apps/desktop/native/target/aarch64-apple-darwin/release/synlexa-studio-desktop-native \
+            apps/desktop/native/target/x86_64-apple-darwin/release/synlexa-studio-desktop-native \
+            -output dist/macos-universal/bin/synlexa-studio-desktop-native
+          chmod +x dist/macos-universal/bin/*
+
+      - name: Assemble Synlexa Studio.app & Universal .dmg
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "$GITHUB_REF_NAME" == "main" || -z "$VERSION" ]]; then
+            VERSION="${{ github.event.inputs.version || '0.4.0' }}"
+          fi
+          echo "REL_VERSION=$VERSION" >> "$GITHUB_ENV"
+
+          APP="dist/Synlexa Studio.app"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/web-dist"
+          cp dist/macos-universal/bin/synlexa-studio-desktop-native "$APP/Contents/MacOS/synlexa-studio-desktop-native"
+          cp dist/macos-universal/bin/studio-cli "$APP/Contents/MacOS/studio-cli"
+          chmod +x "$APP/Contents/MacOS/synlexa-studio-desktop-native" "$APP/Contents/MacOS/studio-cli"
+          cp -R .artifacts-in/apps/web/dist/. "$APP/Contents/Resources/web-dist/"
+          cp apps/desktop/src-tauri/icons/icon.icns "$APP/Contents/Resources/icon.icns"
+          cp apps/web/public/synlexa-s-icon.svg "$APP/Contents/Resources/synlexa-s-icon.svg"
+
+          cat > "$APP/Contents/Info.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key><string>Synlexa Studio</string>
+            <key>CFBundleDisplayName</key><string>Synlexa Studio</string>
+            <key>CFBundleIdentifier</key><string>com.synlexa.studio</string>
+            <key>CFBundleVersion</key><string>${VERSION}</string>
+            <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleExecutable</key><string>synlexa-studio-desktop-native</string>
+            <key>CFBundleIconFile</key><string>icon.icns</string>
+            <key>NSHighResolutionCapable</key><true/>
+            <key>LSMinimumSystemVersion</key><string>11.0</string>
+            <key>CFBundleURLTypes</key>
+            <array>
+              <dict>
+                <key>CFBundleURLName</key><string>com.synlexa.studio.auth</string>
+                <key>CFBundleURLSchemes</key><array><string>synlexa-studio</string></array>
+              </dict>
+            </array>
+          </dict>
+          </plist>
+          PLIST
+
+          # Create headless-tarball for Homebrew / curl
+          STAGE_TAR="dist/macos-tar-stage"
+          mkdir -p "$STAGE_TAR/bin" "$STAGE_TAR/web-dist"
+          cp dist/macos-universal/bin/* "$STAGE_TAR/bin/"
+          cp -R .artifacts-in/apps/web/dist/. "$STAGE_TAR/web-dist/"
+          cp apps/desktop/src-tauri/icons/icon.icns "$STAGE_TAR/icon.icns"
+          mkdir -p dist/out
+          tar -C "$STAGE_TAR" -czf "dist/out/synlexa-studio-v${VERSION}-universal-apple-darwin.tar.gz" .
+
+      - name: Package macOS Universal .app & .dmg
+        run: |
+          VERSION="$REL_VERSION"
+          APP="dist/Synlexa Studio.app"
+          codesign --force --deep --sign - "$APP"
+          mkdir -p dist/dmg-stage
+          cp -R "$APP" dist/dmg-stage/
+          ln -s /Applications dist/dmg-stage/Applications
+          hdiutil create -volname "Synlexa Studio v${VERSION}" \
+            -srcfolder dist/dmg-stage \
+            -ov -format UDZO \
+            "dist/out/Synlexa-Studio-v${VERSION}-universal-apple-darwin.dmg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifacts
+          path: dist/out/*
+
+  build-linux:
+    name: Build Universal Linux (.AppImage, .deb, .tar.gz)
+    needs: build-web-and-wasm
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            deb_arch: amd64
+            appimage_arch: x86_64
+            linker: gcc
+          - target: aarch64-unknown-linux-gnu
+            deb_arch: arm64
+            appimage_arch: aarch64
+            linker: aarch64-linux-gnu-gcc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Cross-Compile Toolchain
+        if: matrix.deb_arch == 'arm64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist-and-npm
+          path: .artifacts-in
+
+      - name: Build Linux Release Binaries
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.linker }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "$GITHUB_REF_NAME" == "main" || -z "$VERSION" ]]; then
+            VERSION="${{ github.event.inputs.version || '0.4.0' }}"
+          fi
+          cargo build --release --locked --target ${{ matrix.target }} -p studio-cli
+          cargo build --release --locked --target ${{ matrix.target }} --manifest-path apps/desktop/native/Cargo.toml
+
+          STAGE="dist/linux-${{ matrix.target }}"
+          mkdir -p "$STAGE/bin" "$STAGE/web-dist" dist/out
+          cp "target/${{ matrix.target }}/release/studio-cli" "$STAGE/bin/"
+          cp "apps/desktop/native/target/${{ matrix.target }}/release/synlexa-studio-desktop-native" "$STAGE/bin/"
+          cp -R .artifacts-in/apps/web/dist/. "$STAGE/web-dist/"
+          tar -C "$STAGE" -czf "dist/out/synlexa-studio-v${VERSION}-${{ matrix.target }}.tar.gz" .
+
+          # Build .deb package
+          DEB_DIR="dist/deb-${{ matrix.deb_arch }}"
+          mkdir -p "$DEB_DIR/DEBIAN" "$DEB_DIR/opt/synlexa-studio" "$DEB_DIR/usr/local/bin" "$DEB_DIR/usr/share/applications" "$DEB_DIR/usr/share/icons/hicolor/512x512/apps"
+          cp -R "$STAGE/." "$DEB_DIR/opt/synlexa-studio/"
+          cp apps/web/public/favicon_io/android-chrome-512x512.png "$DEB_DIR/usr/share/icons/hicolor/512x512/apps/synlexa-studio.png"
+          cat > "$DEB_DIR/usr/local/bin/synlexa-studio" <<'WRAP'
+          #!/usr/bin/env bash
+          if [[ "${1:-}" == "mcp" || "${1:-}" == "inspect" || "${1:-}" == "compare" || "${1:-}" == "peptide" || "${1:-}" == "gene" || "${1:-}" == "smiles" || "${1:-}" == "ramachandran" || "${1:-}" == "--version" || "${1:-}" == "-V" || "${1:-}" == "version" ]]; then
+            exec /opt/synlexa-studio/bin/studio-cli "$@"
+          fi
+          exec /opt/synlexa-studio/bin/synlexa-studio-desktop-native --dist /opt/synlexa-studio/web-dist "$@"
+          WRAP
+          chmod 0755 "$DEB_DIR/usr/local/bin/synlexa-studio"
+          ln -s /opt/synlexa-studio/bin/studio-cli "$DEB_DIR/usr/local/bin/studio-cli"
+          cat > "$DEB_DIR/usr/share/applications/synlexa-studio.desktop" <<'DESK'
+          [Desktop Entry]
+          Type=Application
+          Name=Synlexa Studio
+          Comment=Deterministic Structural Biology & Cheminformatics Workbench (Research-Use-Only)
+          Exec=/usr/local/bin/synlexa-studio
+          Icon=synlexa-studio
+          Categories=Science;Education;
+          Terminal=false
+          DESK
+          cat > "$DEB_DIR/DEBIAN/control" <<CTRL
+          Package: synlexa-studio
+          Version: ${VERSION}
+          Section: science
+          Priority: optional
+          Architecture: ${{ matrix.deb_arch }}
+          Maintainer: Synlexa <support@synlexa.com>
+          Description: Synlexa Studio offline computational biology workbench & MCP server (RUO)
+          CTRL
+          dpkg-deb --build "$DEB_DIR" "dist/out/Synlexa-Studio-v${VERSION}-linux-${{ matrix.deb_arch }}.deb"
+
+          # Build AppImage (x86_64 native)
+          if [[ "${{ matrix.appimage_arch }}" == "x86_64" ]]; then
+            APPDIR="dist/SynlexaStudio.AppDir"
+            mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/web-dist"
+            cp -R "$STAGE/bin/." "$APPDIR/usr/bin/"
+            cp -R "$STAGE/web-dist/." "$APPDIR/usr/share/web-dist/"
+            cp apps/web/public/favicon_io/android-chrome-512x512.png "$APPDIR/synlexa-studio.png"
+            cp "$DEB_DIR/usr/share/applications/synlexa-studio.desktop" "$APPDIR/synlexa-studio.desktop"
+            cat > "$APPDIR/AppRun" <<'APPRUN'
+          #!/usr/bin/env bash
+          HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+          if [[ "${1:-}" == "mcp" || "${1:-}" == "inspect" || "${1:-}" == "compare" || "${1:-}" == "peptide" || "${1:-}" == "gene" || "${1:-}" == "smiles" || "${1:-}" == "ramachandran" || "${1:-}" == "--version" || "${1:-}" == "-V" || "${1:-}" == "version" ]]; then
+            exec "$HERE/usr/bin/studio-cli" "$@"
+          fi
+          exec "$HERE/usr/bin/synlexa-studio-desktop-native" --dist "$HERE/usr/share/web-dist" "$@"
+          APPRUN
+            chmod +x "$APPDIR/AppRun"
+            curl -fsSL -o /tmp/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+            chmod +x /tmp/appimagetool
+            ARCH=x86_64 /tmp/appimagetool --appimage-extract-and-run "$APPDIR" "dist/out/Synlexa-Studio-v${VERSION}-universal-x86_64.AppImage"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.deb_arch }}-artifacts
+          path: dist/out/*
+
+  build-windows:
+    name: Build Windows (x64 & ARM64)
+    needs: build-web-and-wasm
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            arch: x64
+          - target: aarch64-pc-windows-msvc
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist-and-npm
+          path: .artifacts-in
+
+      - name: Build Windows Release Binaries & Package
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}".TrimStart("v")
+          if (-not $ver -or $ver -eq "main") { $ver = "${{ github.event.inputs.version || '0.4.0' }}" }
+          cargo build --release --locked --target ${{ matrix.target }} -p studio-cli
+          cargo build --release --locked --target ${{ matrix.target }} --manifest-path apps/desktop/native/Cargo.toml
+
+          $stage = "dist/win-${{ matrix.arch }}"
+          New-Item -ItemType Directory -Force -Path "$stage/bin", "$stage/web-dist", "dist/out" | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/studio-cli.exe" "$stage/bin/studio-cli.exe"
+          Copy-Item "apps/desktop/native/target/${{ matrix.target }}/release/synlexa-studio-desktop-native.exe" "$stage/bin/synlexa-studio.exe"
+          Copy-Item -Recurse ".artifacts-in/apps/web/dist/*" "$stage/web-dist/"
+
+          Compress-Archive -Path "$stage/*" -DestinationPath "dist/out/Synlexa-Studio-v$ver-windows-${{ matrix.arch }}.zip" -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ matrix.arch }}-artifacts
+          path: dist/out/*.zip
+
+  publish-release:
+    name: Generate SHA-256 Checksums, Install Scripts & Publish Release
+    needs: [build-web-and-wasm, build-macos-universal, build-linux, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Collect All Platform Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-staging
+
+      - name: Generate SHA256SUMS, Copy Install Scripts & Update Homebrew Hashes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "$GITHUB_REF_NAME" == "main" || -z "$VERSION" ]]; then
+            VERSION="${{ github.event.inputs.version || '0.4.0' }}"
+          fi
+          mkdir -p release-files
+          find release-staging -type f \( -name "*.dmg" -o -name "*.tar.gz" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.zip" -o -name "*.tgz" \) -exec cp {} release-files/ \;
+          cp packaging/install.sh release-files/install.sh
+          cp packaging/install.ps1 release-files/install.ps1
+          (cd release-files && sha256sum * > SHA256SUMS.txt)
+          node packaging/homebrew/update-formula-hashes.mjs "$VERSION" release-files
+          cp packaging/homebrew/Formula/synlexa-studio.rb release-files/synlexa-studio.rb
+          cp packaging/homebrew/Casks/synlexa-studio.rb release-files/synlexa-studio.cask.rb
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-files/*
+          generate_release_notes: true
+
+      - name: Sync Homebrew Tap Repositories
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "HOMEBREW_TAP_TOKEN secret not configured; skipping automated tap push."
+            exit 0
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          for TAP_REPO in "Synlexa/homebrew-tap" "nanobiolog/homebrew-tap"; do
+            WORK="/tmp/tap-$(basename "$TAP_REPO")"
+            rm -rf "$WORK"
+            if git clone "https://x-access-token:${TAP_TOKEN}@github.com/${TAP_REPO}.git" "$WORK" 2>/dev/null; then
+              mkdir -p "$WORK/Formula" "$WORK/Casks"
+              cp release-files/synlexa-studio.rb "$WORK/Formula/synlexa-studio.rb"
+              cp release-files/synlexa-studio.cask.rb "$WORK/Casks/synlexa-studio.rb"
+              git -C "$WORK" config user.name "ATIL YALI"
+              git -C "$WORK" config user.email "31862341+nanobiolog@users.noreply.github.com"
+              if [ -n "$(git -C "$WORK" status --porcelain)" ]; then
+                git -C "$WORK" add Formula/synlexa-studio.rb Casks/synlexa-studio.rb
+                git -C "$WORK" commit -m "chore: release synlexa-studio v${VERSION}"
+                git -C "$WORK" push origin HEAD
+              fi
+            fi
+          done

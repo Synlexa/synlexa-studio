@@ -1,0 +1,35 @@
+{
+  "name": "@synlexa/studio-web",
+  "version": "0.4.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "predev": "node ../../scripts/prepare-wasm.mjs",
+    "dev": "vite",
+    "prebuild": "node ../../scripts/prepare-wasm.mjs",
+    "build": "tsc -b && vite build",
+    "pretest": "node ../../scripts/prepare-wasm.mjs",
+    "test": "vitest run",
+    "lint": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
+    "@rdkit/rdkit": "^2026.9.2",
+    "@synlexa/wasm-bridge": "workspace:*",
+    "lucide-react": "^0.475.0",
+    "molstar": "^5.13.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.1.0",
+    "vitest": "^3.0.0"
+  }
+}

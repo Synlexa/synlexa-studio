@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+title: "Synlexa Studio"
+message: "If you use Synlexa Studio in research or software, please cite it using this metadata."
+type: software
+version: "0.4.0"
+date-released: "2026-11-16"
+license: Apache-2.0
+authors:
+  - family-names: "Yali"
+    given-names: "Atil"
+    alias: "nanobiolog"
+repository-code: "https://github.com/Synlexa/synlexa-studio"
+url: "https://www.synlexa.com"
+abstract: >-
+  Deterministic, offline-capable structural biology, peptide biophysics, CRISPR/transcriptomics,
+  and small-molecule cheminformatics workbench powered by a zero-dependency pure-Rust core
+  (synlexa-bio-core), WebAssembly ABI v1, C++20 reference library, Python/TypeScript SDKs,
+  local MCP server, and optional self-hosted GPU compute bridge.
+  For research and development use. Not for diagnostic or treatment decisions.
+keywords:
+  - computational-biology
+  - structural-bioinformatics
+  - kabsch-superposition
+  - cheminformatics
+  - webassembly
+  - mcp
+  - research-software

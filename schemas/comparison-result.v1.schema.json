@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://studio.synlexa.com/schemas/comparison-result.v1.schema.json",
+  "title": "Synlexa Studio Comparison Result v1 (RUO)",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "ruoNotice",
+    "resultId",
+    "engine",
+    "createdAtUtc",
+    "reference",
+    "mobile",
+    "metrics",
+    "transform",
+    "matchedResidues"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "ruoNotice": { "type": "string" },
+    "resultId": { "type": "string" },
+    "engine": {
+      "type": "object",
+      "required": ["name", "version", "target", "floatPrecision"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "target": { "enum": ["native-rust", "wasm-rust", "native-cpp"] },
+        "floatPrecision": { "const": "float64" }
+      }
+    },
+    "createdAtUtc": { "type": "string" },
+    "reference": { "$ref": "#/$defs/structureInputRecord" },
+    "mobile": { "$ref": "#/$defs/structureInputRecord" },
+    "metrics": {
+      "type": "object",
+      "required": ["matchedCaCount", "rmsdAngstrom", "units", "refCoverage", "mobCoverage", "paeStatus"],
+      "properties": {
+        "matchedCaCount": { "type": "integer", "minimum": 1 },
+        "rmsdAngstrom": { "type": "number", "minimum": 0 },
+        "units": { "const": "angstrom" },
+        "refCoverage": { "$ref": "#/$defs/coverageRecord" },
+        "mobCoverage": { "$ref": "#/$defs/coverageRecord" },
+        "paeStatus": { "enum": ["valid", "missing", "incompatible_shape"] }
+      }
+    },
+    "transform": {
+      "type": "object",
+      "required": ["direction", "matrixRowMajor4x4"],
+      "properties": {
+        "direction": { "const": "mobile_to_reference" },
+        "matrixRowMajor4x4": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 16,
+          "maxItems": 16
+        }
+      }
+    },
+    "matchedResidues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["refSeqId", "mobSeqId", "resName3", "resCode1", "distanceAngstrom"],
+        "properties": {
+          "refSeqId": { "type": "integer" },
+          "refInsCode": { "type": "string" },
+          "mobSeqId": { "type": "integer" },
+          "mobInsCode": { "type": "string" },
+          "resName3": { "type": "string" },
+          "resCode1": { "type": "string" },
+          "distanceAngstrom": { "type": "number" },
+          "refBFactor": { "type": ["number", "null"] },
+          "mobPlddt": { "type": ["number", "null"] }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "coverageRecord": {
+      "type": "object",
+      "required": ["numerator", "denominator", "denominatorKind", "ratio"],
+      "properties": {
+        "numerator": { "type": "integer", "minimum": 0 },
+        "denominator": { "type": "integer", "minimum": 0 },
+        "denominatorKind": { "enum": ["declared_polymer_sequence", "coordinate_only"] },
+        "ratio": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "structureInputRecord": {
+      "type": "object",
+      "required": ["label", "chainId", "sha256", "confidenceKind"],
+      "properties": {
+        "label": { "type": "string" },
+        "chainId": { "type": "string" },
+        "authChainId": { "type": ["string", "null"] },
+        "modelIndex": { "type": "integer" },
+        "sha256": { "type": "string" },
+        "confidenceKind": { "enum": ["experimental_b_factor", "prediction_plddt", "none"] },
+        "sourceUrl": { "type": ["string", "null"] },
+        "dataRevision": { "type": ["string", "null"] },
+        "retrievedAtUtc": { "type": ["string", "null"] },
+        "license": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

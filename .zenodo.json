@@ -1,0 +1,27 @@
+{
+  "title": "Synlexa Studio: Deterministic Open-Source Structural Biology & Cheminformatics Workbench",
+  "upload_type": "software",
+  "license": "Apache-2.0",
+  "access_right": "open",
+  "creators": [
+    {
+      "name": "Yali, Atil",
+      "affiliation": "Synlexa"
+    }
+  ],
+  "keywords": [
+    "structural bioinformatics",
+    "Kabsch alignment",
+    "cheminformatics",
+    "WebAssembly",
+    "MCP",
+    "computational biology"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/Synlexa/synlexa-studio",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    }
+  ]
+}

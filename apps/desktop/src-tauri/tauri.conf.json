@@ -1,0 +1,39 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Synlexa Studio",
+  "version": "0.4.0",
+  "identifier": "com.synlexa.studio",
+  "build": {
+    "beforeDevCommand": "pnpm --filter @synlexa/studio-web dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "pnpm --filter @synlexa/studio-web build",
+    "frontendDist": "../../web/dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Synlexa Studio (Research-Use-Only)",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1080,
+        "minHeight": 720,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:* https://*.trycloudflare.com wss://*.trycloudflare.com https://*.ngrok-free.app wss://*.ngrok-free.app https://synlexa.com https://www.synlexa.com https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://alphafold.ebi.ac.uk https://rest.uniprot.org https://pubchem.ncbi.nlm.nih.gov https://www.ebi.ac.uk https://api.platform.opentargets.org https://generativelanguage.googleapis.com https://api.anthropic.com https://api.openai.com"
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["synlexa-studio"]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all"
+  }
+}

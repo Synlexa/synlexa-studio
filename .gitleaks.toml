@@ -1,0 +1,21 @@
+title = "Synlexa Studio Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlist strictly synthetic unit-test fixture tokens and SHA-256 test hashes."
+regexTarget = "match"
+paths = [
+  '''apps/web/src/__tests__/''',
+  '''apps/desktop/native/src/main\.rs$''',
+  '''services/compute-worker/tests/''',
+]
+regexes = [
+  '''sk-ant-(test-)?secret-[0-9]+''',
+  '''sk-openai-test-secret-[0-9]+''',
+  '''AIza-user-byok-key''',
+  '''tok_secret_abc''',
+  '''tok-test-999''',
+  '''secret-123''',
+]

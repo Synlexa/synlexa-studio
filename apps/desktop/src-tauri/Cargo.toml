@@ -1,0 +1,21 @@
+[package]
+name = "synlexa-studio-tauri"
+version = "0.4.0"
+description = "Synlexa Studio Desktop (Tauri v2 scaffold, Research-Use-Only)"
+authors = ["Atil Yali"]
+license = "Apache-2.0"
+edition = "2021"
+
+[workspace]
+
+[lib]
+name = "synlexa_studio_tauri_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-deep-link = "2"
+synlexa-bio-core = { path = "../../../crates/synlexa-bio-core" }
