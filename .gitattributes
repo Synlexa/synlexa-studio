@@ -1,0 +1,28 @@
+# Enforce deterministic LF line endings across macOS, Linux, and Windows
+# so cryptographic SHA-256 fixture checks remain identical on every OS.
+* text=auto eol=lf
+
+*.cif text eol=lf
+*.pdb text eol=lf
+*.json text eol=lf
+*.rs text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.py text eol=lf
+*.cpp text eol=lf
+*.hpp text eol=lf
+*.sh text eol=lf
+*.rb text eol=lf
+*.ps1 text eol=crlf
+*.wasm binary
+*.png binary
+*.ico binary
+*.icns binary
