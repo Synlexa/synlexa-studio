@@ -18,7 +18,8 @@ The client-side auth and assistant modules in [`apps/web/src/lib/studioAuth.ts`]
 | Endpoint (relative to `VITE_SYNLEXA_CLOUD_URL`) | Purpose |
 |---|---|
 | `/auth/studio-connect` | OAuth 2.0 Authorization Code + PKCE (`S256`) login initiation (`deep-link` or `web` popup callback) |
-| `/api/studio/token` | Exchanges PKCE `code` + `code_verifier` for a Synlexa account bearer token |
+| `/api/studio/token` | Exchanges PKCE `code` + `code_verifier` (or a refresh token) for a scoped 1-hour access token and a rotating 30-day refresh token; Studio refreshes before expiry, one tab at a time |
+| `/api/studio/revoke` | Ends the sign-in on synlexa.com when you sign out of Studio |
 | `/api/studio/assistant` | Optional metered Synlexa Cloud AI proxy for users without personal BYOK keys |
 
 Organizations needing managed multi-tenant biomarker pipelines, shared project storage, SAML/OIDC enterprise SSO, and audited analyst report workflows can pair Studio with the commercial Synlexa Core SaaS at [https://www.synlexa.com](https://www.synlexa.com).

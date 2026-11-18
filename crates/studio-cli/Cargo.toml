@@ -9,3 +9,11 @@ homepage.workspace = true
 
 [dependencies]
 synlexa-bio-core = { path = "../synlexa-bio-core" }
+# Synlexa Cloud sign-in: HTTPS via rustls (no system OpenSSL), PKCE hashing and
+# randomness via ring. Local analysis commands do not use the network.
+ureq = { version = "2", default-features = false, features = ["tls"] }
+ring = "0.17"
+
+# OS keychain for Synlexa Cloud credentials; elsewhere a 0600 file is used.
+[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+keyring = { version = "3", features = ["apple-native", "windows-native"] }

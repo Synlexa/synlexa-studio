@@ -23,7 +23,10 @@ import { sha256Digest } from './sha256';
 
 function resolveCloudOrigin(): string {
   try {
-    const raw = (import.meta as { env?: { VITE_SYNLEXA_CLOUD_URL?: string } })?.env?.VITE_SYNLEXA_CLOUD_URL?.trim();
+    // Written as `import.meta.env` literally: Vite only injects env values where
+    // that exact expression appears, so a cast like `(import.meta as …).env` reads nothing.
+    const env = import.meta.env as { VITE_SYNLEXA_CLOUD_URL?: string } | undefined;
+    const raw = env?.VITE_SYNLEXA_CLOUD_URL?.trim();
     if (raw) return raw.replace(/\/+$/, '');
   } catch {
     // Node/Vitest fallback
@@ -43,6 +46,9 @@ export const STUDIO_ASSISTANT_ENDPOINT = `${CLOUD_ORIGIN}/api/studio/assistant`;
 export const STUDIO_AUTH_PENDING_KEY = 'synlexa.studio.auth.pending';
 export const STUDIO_AUTH_SESSION_KEY = 'synlexa.studio.auth.session';
 export const STUDIO_AUTH_TOKEN_KEY = 'synlexa.studio.auth.token';
+/** Rotating refresh token and the access token's expiry (ms since epoch), kept beside the access token. */
+export const STUDIO_AUTH_REFRESH_KEY = 'synlexa.studio.auth.refresh';
+export const STUDIO_AUTH_EXPIRES_KEY = 'synlexa.studio.auth.expires_at';
 /** Tauri event emitted by apps/desktop/src-tauri when the OS opens a deep link. */
 export const STUDIO_DEEP_LINK_EVENT = 'studio-auth-callback';
 /** Pending handshakes expire after 10 minutes. */
@@ -119,6 +125,10 @@ export interface StudioTokenExchangeRequest {
 
 export interface StudioTokenExchangeResult {
   accessToken?: string;
+  /** Rotating refresh token; exchanged at the token endpoint before the access token expires. */
+  refreshToken?: string;
+  /** Access token lifetime in seconds. */
+  expiresIn?: number;
   email?: string;
   displayName?: string;
 }
@@ -488,6 +498,8 @@ export async function defaultStudioTokenExchange(req: StudioTokenExchangeRequest
     const str = (v: unknown) => (typeof v === 'string' && v ? v : undefined);
     return {
       accessToken: str(body.access_token) ?? str(body.accessToken),
+      refreshToken: str(body.refresh_token),
+      expiresIn: typeof body.expires_in === 'number' && body.expires_in > 0 ? body.expires_in : undefined,
       email: str(body.email),
       displayName: str(body.display_name) ?? str(body.displayName),
     };
@@ -569,7 +581,15 @@ export async function completeStudioAuth(
 
   clearPendingStudioAuth(storage);
   saveStudioSession(session, opts.sessionStore);
-  saveStudioAccessToken(exchanged?.accessToken ?? null, opts.sessionStore);
+  saveStudioTokenSet(
+    {
+      accessToken: exchanged?.accessToken ?? null,
+      refreshToken: exchanged?.refreshToken ?? null,
+      expiresIn: exchanged?.expiresIn ?? null,
+    },
+    opts.sessionStore,
+    now,
+  );
   return session;
 }
 
@@ -634,7 +654,7 @@ export function loadStudioSession(store: StorageLike = defaultSessionStore()): S
 export function clearStudioSession(store: StorageLike = defaultSessionStore()): void {
   try {
     store.removeItem(STUDIO_AUTH_SESSION_KEY);
-    store.removeItem(STUDIO_AUTH_TOKEN_KEY);
+    clearStudioTokens(store);
   } catch {
     /* ignore */
   }
@@ -656,6 +676,68 @@ export function loadStudioAccessToken(store: StorageLike = defaultSessionStore()
     return t && /^[A-Za-z0-9._~+/=-]{16,512}$/.test(t) ? t : null;
   } catch {
     return null;
+  }
+}
+
+export interface StudioTokenSet {
+  accessToken: string | null;
+  refreshToken: string | null;
+  /** Access token lifetime in seconds; null when the server did not say. */
+  expiresIn: number | null;
+}
+
+const REFRESH_TOKEN_PATTERN = /^[A-Za-z0-9._~+/=-]{16,512}$/;
+
+/** Stores access token, refresh token and expiry together (each cleared when null). */
+export function saveStudioTokenSet(
+  set: StudioTokenSet,
+  store: StorageLike = defaultSessionStore(),
+  now: () => Date = () => new Date(),
+): void {
+  saveStudioAccessToken(set.accessToken, store);
+  try {
+    if (set.accessToken && set.refreshToken && REFRESH_TOKEN_PATTERN.test(set.refreshToken)) {
+      store.setItem(STUDIO_AUTH_REFRESH_KEY, set.refreshToken);
+    } else {
+      store.removeItem(STUDIO_AUTH_REFRESH_KEY);
+    }
+    if (set.accessToken && set.expiresIn && set.expiresIn > 0) {
+      store.setItem(STUDIO_AUTH_EXPIRES_KEY, String(now().getTime() + set.expiresIn * 1000));
+    } else {
+      store.removeItem(STUDIO_AUTH_EXPIRES_KEY);
+    }
+  } catch {
+    /* ignore quota / disabled storage */
+  }
+}
+
+export function loadStudioRefreshToken(store: StorageLike = defaultSessionStore()): string | null {
+  try {
+    const t = store.getItem(STUDIO_AUTH_REFRESH_KEY);
+    return t && REFRESH_TOKEN_PATTERN.test(t) ? t : null;
+  } catch {
+    return null;
+  }
+}
+
+/** When the stored access token expires (ms since epoch), or null when unknown. */
+export function loadStudioAccessExpiry(store: StorageLike = defaultSessionStore()): number | null {
+  try {
+    const raw = Number(store.getItem(STUDIO_AUTH_EXPIRES_KEY));
+    return Number.isFinite(raw) && raw > 0 ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Removes access token, refresh token and expiry, leaving the session record. */
+export function clearStudioTokens(store: StorageLike = defaultSessionStore()): void {
+  try {
+    store.removeItem(STUDIO_AUTH_TOKEN_KEY);
+    store.removeItem(STUDIO_AUTH_REFRESH_KEY);
+    store.removeItem(STUDIO_AUTH_EXPIRES_KEY);
+  } catch {
+    /* ignore */
   }
 }
 

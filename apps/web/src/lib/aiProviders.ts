@@ -38,6 +38,7 @@ import { RUO_DISCLAIMER } from './reportGenerator';
 import { getVaultSecret, setVaultSecret } from './secureKeyVault';
 import { recordUsage } from './usageTracker';
 import { loadStudioAccessToken, STUDIO_ASSISTANT_ENDPOINT } from './studioAuth';
+import { getFreshStudioAccessToken, withStudioTokenRetry } from './studioTokens';
 
 export type AiProviderId = 'synlexa' | 'anthropic' | 'gemini' | 'openai';
 
@@ -732,11 +733,16 @@ export async function runAssistantTurn(opts: RunOpts & { config: AiConfig }): Pr
   } else if (activeProvider === 'openai') {
     reply = await runOpenAiTurn({ ...opts, enableWebSearch, apiKey: p.apiKey, model: p.model });
   } else if (activeProvider === 'synlexa') {
+    // The access token lasts an hour: refresh it first when it is about to
+    // expire, and once more if the server still answers 401.
+    const fetchFn = opts.fetchImpl ?? globalThis.fetch;
+    const token = (await getFreshStudioAccessToken({ fetchImpl: fetchFn })) ?? p.apiKey;
     reply = await runGeminiAgentTurn({
       ...opts,
       enableWebSearch,
       model: p.model as GeminiModelId,
-      transport: { endpoint: STUDIO_ASSISTANT_ENDPOINT, headers: { Authorization: `Bearer ${p.apiKey}` } },
+      fetchImpl: withStudioTokenRetry(fetchFn),
+      transport: { endpoint: STUDIO_ASSISTANT_ENDPOINT, headers: { Authorization: `Bearer ${token}` } },
     });
   } else {
     reply = await runGeminiAgentTurn({

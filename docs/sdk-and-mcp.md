@@ -65,3 +65,25 @@ Example `~/.claude/mcp.json` / client configuration:
   }
 }
 ```
+
+## 6. Synlexa Cloud sign-in from the CLI (optional)
+
+Every local command above works signed out and offline. Signing in only adds
+Synlexa Cloud features on your plan (cloud AI, plan and usage information).
+
+```bash
+studio-cli login              # opens synlexa.com in your browser (OAuth 2.0 + PKCE, loopback redirect)
+studio-cli login --device     # no browser on this machine: approve a short code at synlexa.com/activate
+studio-cli whoami             # account, plan and cloud models on your plan (--json for scripts)
+studio-cli usage              # remaining Synlexa Cloud usage per window (--json for scripts)
+studio-cli upgrade --plan pro # opens checkout and waits for the plan change
+studio-cli logout             # ends the sign-in on synlexa.com and removes local credentials
+```
+
+- Access tokens last one hour and refresh automatically; refresh tokens rotate on each use.
+- Credentials are stored in the macOS Keychain or Windows Credential Manager, and in
+  `~/.synlexa-studio/credentials.json` (mode 0600) on Linux. Set
+  `SYNLEXA_CLI_CREDENTIAL_STORE=file` to use the file everywhere, or
+  `SYNLEXA_CLI_CREDENTIALS_FILE=<path>` to choose its location.
+- `SYNLEXA_CLOUD_URL` points the CLI at a self-hosted or local website (HTTPS, or `http://localhost` / `http://127.0.0.1` only).
+- Tokens are never printed. Each sign-in is listed, and can be revoked, in your synlexa.com account settings.

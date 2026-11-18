@@ -46,10 +46,15 @@ import {
 import { clearLibrary, exportLibrary, formatBytes, listLibrary, subscribeLibrary } from '../lib/moleculeLibrary';
 import { RUO_DISCLAIMER } from '../lib/reportGenerator';
 import { clearRunHistory } from '../lib/runHistory';
+import { type StudioSession } from '../lib/studioAuth';
+import { signOutStudio } from '../lib/studioTokens';
 import {
-  clearStudioSession,
-  type StudioSession,
-} from '../lib/studioAuth';
+  fetchStudioEntitlements,
+  planDisplayName,
+  usagePercent,
+  usageWindowLabel,
+  type StudioEntitlements,
+} from '../lib/studioEntitlements';
 import { getVaultStatus, subscribeVault } from '../lib/secureKeyVault';
 import { clearUsage, loadUsage, subscribeUsage, summarizeUsage } from '../lib/usageTracker';
 import { Badge, Button, Card, cx, FieldRow, IconButton, Input, Kbd, Select, Toggle, useFeedback } from './ui';
@@ -268,6 +273,67 @@ function SectionTitle({ title, description }: { title: string; description?: str
 
 // ---------------- Account ----------------
 
+/** Plan and remaining Synlexa Cloud usage, read from synlexa.com. */
+function CloudPlanCard() {
+  const [state, setState] = useState<{ loading: boolean; data: StudioEntitlements | null }>({ loading: true, data: null });
+  useEffect(() => {
+    let cancelled = false;
+    void fetchStudioEntitlements().then((data) => {
+      if (!cancelled) setState({ loading: false, data });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const { loading, data } = state;
+  return (
+    <Card title="Synlexa Cloud plan">
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-slate-400">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading your plan…
+        </div>
+      ) : !data ? (
+        <div className="text-sm text-slate-400">
+          Your plan could not be loaded. Local tools and your own API keys keep working.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Badge tone="accent">{planDisplayName(data.plan)}</Badge>
+            {data.metered && <Badge>Usage billed by contract</Badge>}
+          </div>
+          {data.usage
+            .filter((w) => w.limit !== null)
+            .map((w) => {
+              const pct = usagePercent(w) ?? 0;
+              return (
+                <div key={w.kind}>
+                  <div className="flex justify-between text-xs text-slate-400">
+                    <span>{usageWindowLabel(w.kind)}</span>
+                    <span>
+                      {pct}% used
+                      {w.resetsAt && pct > 0 ? ` · resets ${new Date(w.resetsAt).toLocaleString()}` : ''}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800">
+                    <div
+                      className={cx('h-full rounded-full', pct >= 90 ? 'bg-rose-400' : pct >= 70 ? 'bg-amber-400' : 'bg-sky-400')}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          <div className="text-xs text-slate-500">
+            Cloud models on your plan: {data.allowedModels.length ? data.allowedModels.join(', ') : 'none'}. Your own API
+            keys are not limited by this plan.
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function AccountSection({
   session,
   onSessionChange,
@@ -321,7 +387,7 @@ function AccountSection({
                   confirmLabel: 'Sign out',
                 });
                 if (!ok) return;
-                clearStudioSession();
+                await signOutStudio();
                 onSessionChange(null);
                 toast('Signed out', 'success');
               }}
@@ -370,6 +436,7 @@ function AccountSection({
           </div>
         )}
       </Card>
+      {session?.serverVerified && <CloudPlanCard />}
       <Card title="Where your data lives">
         <ul className="space-y-2 text-sm text-slate-300">
           <li className="flex gap-2">

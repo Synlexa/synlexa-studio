@@ -1,4 +1,7 @@
-//! Native CLI & stdio MCP server for Synlexa Studio (`inspect`, `compare`, `peptide`, `gene`, `smiles`, `ramachandran`, `mcp`).
+//! Native CLI & stdio MCP server for Synlexa Studio (`inspect`, `compare`, `peptide`, `gene`, `smiles`, `ramachandran`, `mcp`),
+//! plus Synlexa Cloud sign-in (`login`, `whoami`, `usage`, `upgrade`, `logout`).
+
+mod cloud;
 
 use std::env;
 use std::fs;
@@ -103,6 +106,13 @@ fn print_usage() {
          \x20 studio-cli smiles --smiles <smiles> [--name <label>] [--out <path>]\n\
          \x20 studio-cli ramachandran --input <path> [--chain <id>] [--out <path>]\n\
          \x20 studio-cli mcp [--stdio]\n\
+         \n\
+         Synlexa Cloud account (local tools never need sign-in):\n\
+         \x20 studio-cli login [--device] [--no-browser]\n\
+         \x20 studio-cli whoami [--json]\n\
+         \x20 studio-cli usage [--json]\n\
+         \x20 studio-cli upgrade [--plan starter|pro|team]\n\
+         \x20 studio-cli logout\n\
          \x20 studio-cli --version"
     );
 }
@@ -482,6 +492,9 @@ fn run(args: &[String]) -> Result<(), CoreError> {
     let rest = &args[2..];
     if sub == "mcp" {
         return run_mcp_stdio();
+    }
+    if matches!(sub, "login" | "logout" | "whoami" | "usage" | "upgrade") {
+        return cloud::run(sub, rest);
     }
     let out_path = take_opt(rest, "--out");
     let pretty = rest.iter().any(|a| a == "--pretty");
